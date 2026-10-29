@@ -59,6 +59,12 @@ Modificateurs : `Win`/`Cmd`, `Alt`/`Option`, `Ctrl`, `Shift`. Redémarrez l'appl
 
 Pour simuler `Cmd+V`, macOS exige l'autorisation Accessibilité. Ouvrez Réglages Système > Confidentialité et sécurité > Accessibilité, ajoutez et activez `clip-md-html` (ou le terminal qui le lance), puis relancez l'application. Sans elle, le contenu est converti mais vous devez coller vous-même avec `Cmd+V` ; une notification vous le rappelle. L'application n'a pas d'icône dans le Dock, seulement dans la barre de menus.
 
+
+## Antivirus
+
+L'exécutable n'est pas signé et combine un raccourci global, un collage simulé (`SendInput` / `CGEvent`), le presse-papiers et un démarrage automatique optionnel : certains antivirus (heuristiques) peuvent donc le signaler à tort. Ce que fait réellement le programme : il enregistre un seul raccourci via `RegisterHotKey`, sans hook clavier ni lecture de l'état des touches, n'écrit rien en dehors de sa configuration, ne télécharge rien et ne se copie nulle part. Le démarrage automatique n'est activé que si vous cochez la case dans le menu. Le code source est ouvert et l'exécutable embarque ses métadonnées (nom, description, version) et un manifeste sans élévation.
+
+Pendant le développement, vous pouvez ajouter une exclusion pour le dossier `target/` du dépôt. Une signature de code est envisageable plus tard.
 ## Développement
 
 ```sh

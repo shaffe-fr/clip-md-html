@@ -5,6 +5,7 @@ mod clipboard;
 mod config;
 mod convert;
 mod icon;
+mod icon_pixels;
 mod platform;
 
 fn main() {
