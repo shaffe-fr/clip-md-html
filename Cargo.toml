@@ -2,7 +2,7 @@
 name = "clip-md-html"
 version = "0.1.0"
 edition = "2021"
-description = "Convertit le Markdown du presse-papiers en HTML riche et le colle (Win+Alt+V)"
+description = "Tray app that converts clipboard Markdown to rich HTML and pastes it with a global hotkey"
 license = "MIT"
 repository = "https://github.com/shaffe-fr/clip-md-html"
 readme = "README.md"

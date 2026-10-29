@@ -33,20 +33,20 @@ jobs:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: cargo build --release --locked --target ${{ matrix.target }}
-      - name: Renommer le binaire
+      - name: Rename binary
         shell: bash
         run: cp "target/${{ matrix.target }}/release/${{ matrix.file }}" "${{ matrix.asset }}"
-      # SignPath exige l'exécutable non signé comme artefact du workflow.
+      # SignPath takes the unsigned binary from a workflow artifact.
       - id: upload
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unsigned-${{ matrix.asset }}
           path: ${{ matrix.asset }}
           if-no-files-found: error
-      # Signature Windows via SignPath Foundation. Activer en définissant la variable
-      # de dépôt SIGNPATH_ENABLED=true, le secret SIGNPATH_API_TOKEN et les variables
-      # SIGNPATH_ORGANIZATION_ID, SIGNPATH_PROJECT_SLUG, SIGNPATH_SIGNING_POLICY_SLUG.
-      - name: Signer avec SignPath
+      # SignPath Foundation signing. Enable with repo variable SIGNPATH_ENABLED=true, secret
+      # SIGNPATH_API_TOKEN and variables SIGNPATH_ORGANIZATION_ID, SIGNPATH_PROJECT_SLUG,
+      # SIGNPATH_SIGNING_POLICY_SLUG.
+      - name: Sign with SignPath
         if: matrix.os == 'windows-latest' && vars.SIGNPATH_ENABLED == 'true'
         uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
         with:
@@ -57,7 +57,7 @@ jobs:
           github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
           wait-for-completion: true
           output-artifact-directory: signed
-      - name: Remplacer par le binaire signé
+      - name: Use signed binary
         if: matrix.os == 'windows-latest' && vars.SIGNPATH_ENABLED == 'true'
         shell: bash
         run: cp "signed/${{ matrix.asset }}" "${{ matrix.asset }}"

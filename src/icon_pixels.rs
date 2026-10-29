@@ -1,4 +1,4 @@
-/// Pixels RGBA 32x32 : disque bleu avec un « M » blanc (partagé avec build.rs pour l'icône de l'exe).
+/// 32x32 RGBA: blue disc with a white "M". Shared with build.rs so the exe icon matches the tray icon.
 pub fn rgba() -> Vec<u8> {
     const N: i32 = 32;
     let mut px = vec![0u8; (N * N * 4) as usize];

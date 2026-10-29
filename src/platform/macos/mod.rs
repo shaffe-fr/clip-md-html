@@ -22,12 +22,12 @@ pub fn config_dir() -> PathBuf {
     home.join("Library/Application Support/clip-md-html")
 }
 
-/// Verrou de fichier exclusif ; retourne `None` si une autre instance tourne déjà.
+/// Exclusive file lock: `None` if another instance is already running.
 pub fn single_instance() -> Option<()> {
     let _ = std::fs::create_dir_all(config_dir());
     let file = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(config_dir().join("instance.lock")).ok()?;
     file.try_lock().ok()?;
-    // Le fichier (donc le verrou) reste ouvert jusqu'à la fin du processus.
+    // Leaked on purpose: closing the file would release the lock.
     std::mem::forget(file);
     Some(())
 }
@@ -40,7 +40,7 @@ struct Handler {
 }
 
 impl ApplicationHandler<()> for Handler {
-    // Le tray doit être créé une fois NSApplication démarré, sur le thread principal.
+    // The tray must be created on the main thread once NSApplication is running.
     fn resumed(&mut self, _el: &ActiveEventLoop) {
         if self.app.is_none() {
             self.app = Some(App::new(self.tx.clone(), self.wake.clone()));
@@ -60,11 +60,11 @@ impl ApplicationHandler<()> for Handler {
     }
 }
 
-/// Boucle d'événements sur le thread principal, sans icône dans le Dock (Accessory).
+/// Accessory activation policy: menu bar icon only, no Dock icon.
 pub fn run() {
     let mut builder = EventLoop::<()>::with_user_event();
     builder.with_activation_policy(ActivationPolicy::Accessory);
-    let event_loop = builder.build().expect("boucle d'événements");
+    let event_loop = builder.build().expect("failed to create event loop");
     let proxy = event_loop.create_proxy();
     let (tx, rx) = channel();
     let wake: Wake = Arc::new(move || {

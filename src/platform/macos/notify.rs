@@ -1,6 +1,6 @@
 use std::process::Command;
 
-/// Notifications via le centre de notifications (osascript), sans dépendance.
+/// Notification Center via osascript, to avoid an extra dependency.
 pub struct Notifier;
 
 fn escape(s: &str) -> String {

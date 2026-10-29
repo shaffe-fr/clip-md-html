@@ -19,10 +19,10 @@ const HID_EVENT_TAP: u32 = 0;
 const KEYCODE_V: u16 = 9;
 const FLAG_COMMAND: u64 = 0x0010_0000;
 
-const HELP: &str = "Autorisez clip-md-html dans Réglages Système > Confidentialité et sécurité > Accessibilité \
-pour permettre le collage automatique, puis relancez l'application.";
+const HELP: &str = "Allow clip-md-html in System Settings > Privacy & Security > Accessibility \
+to enable automatic paste, then restart the app.";
 
-/// Message d'aide si l'autorisation Accessibilité manque (nécessaire pour simuler Cmd+V).
+/// Posting Cmd+V requires the Accessibility permission.
 pub fn paste_permission_problem() -> Option<String> {
     if unsafe { AXIsProcessTrusted() } {
         None
@@ -42,11 +42,12 @@ fn post_v(down: bool) {
         CFRelease(ev);
     }
 }
-/// Envoie Cmd+V. Les flags sont fixés explicitement sur chaque événement (Cmd seul), donc
-/// Option/Maj encore enfoncés physiquement n'altèrent pas le raccourci ; aucune lecture de l'état du clavier.
+
+/// Flags are set explicitly to Cmd only on each event, so Option/Shift still physically held
+/// from the hotkey do not alter the shortcut. No keyboard state reads.
 pub fn paste() -> Result<(), String> {
     if let Some(msg) = paste_permission_problem() {
-        return Err(format!("Texte converti, mais collage automatique impossible. {msg}"));
+        return Err(format!("Text converted, but automatic paste is unavailable. {msg}"));
     }
     std::thread::sleep(std::time::Duration::from_millis(80));
     post_v(true);

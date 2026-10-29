@@ -1,5 +1,6 @@
-//! Code spécifique à chaque OS. Chaque backend expose la même interface :
-//! `DEFAULT_HOTKEY`, `config_dir`, `single_instance`, `paste`, `autostart`, `Notifier`, `run`.
+//! OS backends. Each one exposes the same interface:
+//! `DEFAULT_HOTKEY`, `config_dir`, `single_instance`, `paste`, `paste_permission_problem`,
+//! `autostart`, `Notifier`, `run`.
 
 #[cfg(windows)]
 mod windows;
@@ -12,4 +13,4 @@ mod macos;
 pub use macos::*;
 
 #[cfg(not(any(windows, target_os = "macos")))]
-compile_error!("clip-md-html ne supporte que Windows et macOS");
+compile_error!("clip-md-html only supports Windows and macOS");

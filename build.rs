@@ -1,4 +1,5 @@
-//! Sous Windows : embarque métadonnées (VERSIONINFO), icône et manifeste dans l'exécutable.
+//! Windows: embeds VERSIONINFO, icon and an asInvoker manifest. Unsigned binaries without
+//! metadata trip more antivirus heuristics.
 
 #[cfg(windows)]
 #[path = "src/icon_pixels.rs"]
@@ -28,7 +29,6 @@ const MANIFEST: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?
 </assembly>
 "#;
 
-/// ICO 32x32 32 bits (DIB) généré depuis les mêmes pixels que l'icône de la barre d'état.
 #[cfg(windows)]
 fn ico_bytes() -> Vec<u8> {
     let rgba = icon_pixels::rgba();
@@ -46,7 +46,7 @@ fn ico_bytes() -> Vec<u8> {
             dib.extend_from_slice(&[rgba[i + 2], rgba[i + 1], rgba[i], rgba[i + 3]]);
         }
     }
-    dib.extend(std::iter::repeat_n(0u8, h * 4)); // masque AND
+    dib.extend(std::iter::repeat_n(0u8, h * 4)); // AND mask
     let mut ico = vec![0, 0, 1, 0, 1, 0, w as u8, h as u8, 0, 0, 1, 0, 32, 0];
     ico.extend_from_slice(&(dib.len() as u32).to_le_bytes());
     ico.extend_from_slice(&22u32.to_le_bytes());
@@ -65,14 +65,14 @@ fn embed() {
     let mut res = winresource::WindowsResource::new();
     res.set_icon(ico.to_str().unwrap())
         .set_manifest(MANIFEST)
-        .set_language(0x040C)
+        .set_language(0x0409)
         .set("ProductName", "clip-md-html")
-        .set("FileDescription", "Convertit le Markdown du presse-papier en HTML")
+        .set("FileDescription", "Converts clipboard Markdown to HTML")
         .set("CompanyName", "shaffe-fr")
         .set("OriginalFilename", "clip-md-html.exe")
         .set("InternalName", "clip-md-html")
         .set("LegalCopyright", "MIT - shaffe-fr");
-    res.compile().expect("compilation des ressources Windows");
+    res.compile().expect("failed to compile Windows resources");
 }
 
 fn main() {

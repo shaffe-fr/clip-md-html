@@ -1,6 +1,6 @@
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
 
-const DUMMY_VK: u16 = 0xE8; // touche non assignée : empêche Alt/Win seuls d'ouvrir un menu
+const DUMMY_VK: u16 = 0xE8; // unassigned key: stops a lone Alt/Win release from opening a menu
 
 fn key(vk: u16, up: bool) -> INPUT {
     INPUT {
@@ -11,11 +11,11 @@ fn key(vk: u16, up: bool) -> INPUT {
     }
 }
 
-/// Envoie Ctrl+V à la fenêtre au premier plan en un seul appel `SendInput`.
+/// Sends Ctrl+V to the foreground window in a single `SendInput` batch.
 ///
-/// Win/Alt/Maj sont encore physiquement enfoncés quand le raccourci se déclenche : on envoie
-/// donc leur relâchement explicite dans le même lot, après une touche factice, puis Ctrl+V.
-/// Aucune lecture de l'état du clavier, aucun hook.
+/// The hotkey modifiers are still physically held when it fires, so the batch releases them
+/// explicitly (after a dummy key) before Ctrl+V. No keyboard state reads and no hooks, which
+/// keeps antivirus heuristics quiet.
 pub fn paste() -> Result<(), String> {
     let releases = [VK_LWIN, VK_RWIN, VK_LMENU, VK_RMENU, VK_LSHIFT, VK_RSHIFT, VK_LCONTROL, VK_RCONTROL];
     let mut inputs = vec![key(DUMMY_VK, false), key(DUMMY_VK, true)];
@@ -25,6 +25,6 @@ pub fn paste() -> Result<(), String> {
     if sent as usize == inputs.len() {
         Ok(())
     } else {
-        Err("collage automatique bloqué par Windows (fenêtre élevée ?)".into())
+        Err("automatic paste blocked by Windows (elevated target window?)".into())
     }
 }

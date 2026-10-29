@@ -20,11 +20,11 @@ pub fn config_dir() -> PathBuf {
     base.join("clip-md-html")
 }
 
-/// Mutex nommé : retourne `None` si une autre instance tourne déjà.
+/// Named mutex: `None` if another instance is already running.
 pub fn single_instance() -> Option<()> {
     let name: Vec<u16> = "Local\\clip-md-html-single-instance\0".encode_utf16().collect();
     unsafe {
-        // Le handle reste ouvert jusqu'à la fin du processus (volontaire).
+        // The handle is intentionally leaked so the mutex lives as long as the process.
         let h = CreateMutexW(null(), 0, name.as_ptr());
         if h.is_null() || GetLastError() == ERROR_ALREADY_EXISTS {
             return None;
@@ -33,7 +33,7 @@ pub fn single_instance() -> Option<()> {
     Some(())
 }
 
-/// Boucle de messages Win32 (le tray et le raccourci global y sont servis).
+/// Win32 message loop; tray-icon and global-hotkey deliver their events through it.
 pub fn run() {
     let (tx, rx) = mpsc::channel();
     let tid = unsafe { GetCurrentThreadId() };
@@ -63,7 +63,6 @@ pub fn run() {
     }
 }
 
-/// Pas d'autorisation particulière sous Windows.
 pub fn paste_permission_problem() -> Option<String> {
     None
 }

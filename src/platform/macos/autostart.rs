@@ -15,7 +15,7 @@ fn xml_escape(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }
 
-/// Crée ou supprime un LaunchAgent (lancé à l'ouverture de session suivante).
+/// The LaunchAgent is not loaded now; it takes effect at the next login.
 pub fn set_enabled(enabled: bool) -> Result<(), String> {
     let path = plist_path();
     if !enabled {
@@ -36,6 +36,6 @@ pub fn set_enabled(enabled: bool) -> Result<(), String> {
 </dict>\n</plist>\n",
         xml_escape(&exe.display().to_string())
     );
-    std::fs::create_dir_all(path.parent().ok_or("chemin invalide")?).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(path.parent().ok_or("invalid LaunchAgents path")?).map_err(|e| e.to_string())?;
     std::fs::write(&path, plist).map_err(|e| e.to_string())
 }

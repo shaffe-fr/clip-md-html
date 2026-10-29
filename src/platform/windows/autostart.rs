@@ -25,7 +25,7 @@ pub fn set_enabled(enabled: bool) -> Result<(), String> {
     unsafe {
         let mut key: HKEY = null_mut();
         if RegOpenKeyExW(HKEY_CURRENT_USER, wide(SUBKEY).as_ptr(), 0, KEY_SET_VALUE, &mut key) != ERROR_SUCCESS {
-            return Err("clé Run inaccessible".into());
+            return Err("cannot open the Run registry key".into());
         }
         let r = if enabled {
             let exe = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -33,9 +33,9 @@ pub fn set_enabled(enabled: bool) -> Result<(), String> {
             RegSetValueExW(key, wide(VALUE).as_ptr(), 0, REG_SZ, cmd.as_ptr() as *const u8, (cmd.len() * 2) as u32)
         } else {
             let r = RegDeleteValueW(key, wide(VALUE).as_ptr());
-            if r == 2 { ERROR_SUCCESS } else { r } // 2 = valeur absente
+            if r == 2 { ERROR_SUCCESS } else { r } // ERROR_FILE_NOT_FOUND: already disabled
         };
         RegCloseKey(key);
-        if r == ERROR_SUCCESS { Ok(()) } else { Err(format!("erreur registre {r}")) }
+        if r == ERROR_SUCCESS { Ok(()) } else { Err(format!("registry error {r}")) }
     }
 }

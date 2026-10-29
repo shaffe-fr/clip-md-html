@@ -23,13 +23,13 @@ pub struct App {
 }
 
 impl App {
-    /// À créer sur le thread de la boucle d'événements (tray + raccourci y sont rattachés).
+    /// Must be created on the event loop thread: the tray and the hotkey are bound to it.
     pub fn new(tx: Sender<Msg>, wake: Wake) -> Self {
         let mut notifier = Notifier::new();
 
-        let convert = MenuItem::new("Convertir maintenant", true, None);
+        let convert = MenuItem::new("Convert now", true, None);
         let autostart_item = CheckMenuItem::new(autostart_label(), true, autostart::is_enabled(), None);
-        let quit = MenuItem::new("Quitter", true, None);
+        let quit = MenuItem::new("Quit", true, None);
         let menu = Menu::new();
         let _ = menu.append_items(&[&convert, &autostart_item, &PredefinedMenuItem::separator(), &quit]);
 
@@ -38,8 +38,8 @@ impl App {
             .with_tooltip("clip-md-html")
             .with_icon(crate::icon::tray_icon())
             .build()
-            .expect("création de l'icône de la barre d'état");
-        log("icône de la barre d'état créée");
+            .expect("failed to create tray icon");
+        log("tray icon created");
 
         let (tx_m, wake_m) = (tx.clone(), wake.clone());
         MenuEvent::set_event_handler(Some(move |e: MenuEvent| {
@@ -66,7 +66,7 @@ impl App {
         }
     }
 
-    /// Traite un message ; retourne `true` pour quitter.
+    /// Returns `true` to quit.
     pub fn handle(&mut self, msg: Msg) -> bool {
         match msg {
             Msg::Hotkey => self.convert(true),
@@ -76,7 +76,7 @@ impl App {
                 let want = self.autostart_item.is_checked();
                 if let Err(e) = autostart::set_enabled(want) {
                     self.autostart_item.set_checked(!want);
-                    self.notifier.show("clip-md-html", &format!("Démarrage automatique impossible : {e}"));
+                    self.notifier.show("clip-md-html", &format!("Could not change start at login: {e}"));
                 }
             }
             Msg::Menu(_) => {}
@@ -87,41 +87,41 @@ impl App {
     fn convert(&mut self, paste: bool) {
         match convert_clipboard() {
             Ok(()) => {
-                log("conversion effectuée");
+                log("conversion done");
                 if paste {
                     std::thread::sleep(std::time::Duration::from_millis(50));
                     if let Err(e) = platform::paste() {
-                        log(&format!("collage impossible : {e}"));
+                        log(&format!("paste failed: {e}"));
                         self.notifier.show("clip-md-html", &e);
                     }
                 }
             }
             Err(e) => {
-                log(&format!("rien à convertir : {e}"));
-                self.notifier.show("clip-md-html", &format!("Rien à convertir : {e}."));
+                log(&format!("nothing to convert: {e}"));
+                self.notifier.show("clip-md-html", &format!("Nothing to convert: {e}."));
             }
         }
     }
 }
 
 fn autostart_label() -> &'static str {
-    if cfg!(windows) { "Démarrer avec Windows" } else { "Démarrer à l'ouverture de session" }
+    if cfg!(windows) { "Start with Windows" } else { "Start at login" }
 }
 
 fn register_hotkey(notifier: &mut Notifier) -> Option<GlobalHotKeyManager> {
     let (cfg, cfg_err) = config::load();
     if let Some(e) = cfg_err {
-        let msg = format!("{e}. Raccourci par défaut ({}) utilisé. Config : {}", config::DEFAULT_HOTKEY, config::config_path().display());
+        let msg = format!("{e}. Using default hotkey ({}). Config: {}", config::DEFAULT_HOTKEY, config::config_path().display());
         log(&msg);
-        notifier.show("clip-md-html : configuration", &msg);
+        notifier.show("clip-md-html: configuration", &msg);
     }
     let hotkey = match config::parse_hotkey(&cfg.hotkey) {
         Ok(h) => h,
         Err(e) => {
-            let msg = format!("{e}. Raccourci par défaut ({}) utilisé. Config : {}", config::DEFAULT_HOTKEY, config::config_path().display());
+            let msg = format!("{e}. Using default hotkey ({}). Config: {}", config::DEFAULT_HOTKEY, config::config_path().display());
             log(&msg);
-            notifier.show("clip-md-html : configuration", &msg);
-            config::parse_hotkey(config::DEFAULT_HOTKEY).expect("raccourci par défaut valide")
+            notifier.show("clip-md-html: configuration", &msg);
+            config::parse_hotkey(config::DEFAULT_HOTKEY).expect("default hotkey is valid")
         }
     };
     let result = GlobalHotKeyManager::new().map_err(|e| e.to_string()).and_then(|m| {
@@ -130,17 +130,17 @@ fn register_hotkey(notifier: &mut Notifier) -> Option<GlobalHotKeyManager> {
     });
     match result {
         Ok(m) => {
-            log(&format!("raccourci enregistré : {hotkey} (config : {})", cfg.hotkey));
+            log(&format!("hotkey registered: {hotkey} (config: {})", cfg.hotkey));
             Some(m)
         }
         Err(e) => {
             let msg = format!(
-                "Le raccourci {} est indisponible ({e}). Il est peut-être déjà utilisé : changez-le dans {}",
+                "Hotkey {} is unavailable ({e}). It may already be in use; change it in {}",
                 cfg.hotkey,
                 config::config_path().display()
             );
             log(&msg);
-            notifier.show("clip-md-html : raccourci indisponible", &msg);
+            notifier.show("clip-md-html: hotkey unavailable", &msg);
             None
         }
     }
@@ -149,6 +149,6 @@ fn register_hotkey(notifier: &mut Notifier) -> Option<GlobalHotKeyManager> {
 fn check_paste_permission(notifier: &mut Notifier) {
     if let Some(msg) = platform::paste_permission_problem() {
         log(&msg);
-        notifier.show("clip-md-html : autorisation requise", &msg);
+        notifier.show("clip-md-html: permission required", &msg);
     }
 }

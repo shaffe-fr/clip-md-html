@@ -35,7 +35,7 @@ impl Notifier {
         d
     }
 
-    /// Affiche un ballon Windows ; l'icône temporaire est retirée par `cleanup` (timer).
+    /// Balloon shown from a temporary notification icon, removed by `cleanup` when the timer fires.
     pub fn show(&mut self, title: &str, msg: &str) {
         self.cleanup();
         let mut d = self.data();
@@ -53,7 +53,7 @@ impl Notifier {
         }
     }
 
-    /// Vrai si `id` est le timer de nettoyage en cours (l'ID est attribué par SetTimer).
+    /// Thread timers get their ID from SetTimer, so it must be compared against the stored one.
     pub fn owns_timer(&self, id: usize) -> bool {
         self.timer != 0 && self.timer == id
     }

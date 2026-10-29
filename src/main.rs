@@ -11,7 +11,7 @@ mod platform;
 fn main() {
     if std::env::args().any(|a| a == "--once") {
         if let Err(e) = clipboard::convert_clipboard() {
-            config::log(&format!("--once : {e}"));
+            config::log(&format!("--once: {e}"));
             std::process::exit(1);
         }
         return;

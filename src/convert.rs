@@ -1,6 +1,6 @@
 use pulldown_cmark::{html, Options, Parser};
 
-/// Convertit du Markdown en HTML sémantique, sans aucun style.
+/// Semantic HTML with no styling, so the target editor applies its own defaults.
 pub fn markdown_to_html(markdown: &str) -> String {
     let options = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TASKLISTS;
     let parser = Parser::new_ext(markdown, options);

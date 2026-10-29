@@ -23,15 +23,14 @@ pub fn config_path() -> PathBuf {
 
 fn template() -> String {
     format!(
-        "# Raccourci global pour convertir et coller le Markdown du presse-papiers.\n\
-# Modificateurs : Win (ou Cmd sur macOS), Alt (Option sur macOS), Ctrl, Shift.\n\
-# Exemples : \"Win+Alt+V\", \"Cmd+Alt+V\", \"Win+Shift+M\".\n\
-# Éviter Ctrl+Alt (AltGr sur AZERTY) et Ctrl+Shift+V (collage sans format dans Thunderbird).\n\
+        "# Global hotkey that converts the clipboard Markdown and pastes it.\n\
+# Modifiers: Win (Cmd on macOS), Alt (Option on macOS), Ctrl, Shift.\n\
+# Examples: \"Win+Alt+V\", \"Cmd+Alt+V\", \"Win+Shift+M\".\n\
+# Avoid Ctrl+Alt (AltGr on AZERTY layouts) and Ctrl+Shift+V (Thunderbird's paste as plain text).\n\
 hotkey = \"{DEFAULT_HOTKEY}\"\n"
     )
 }
 
-/// Journal minimal (fichier `clip-md-html.log` à côté de la config).
 pub fn log(msg: &str) {
     use std::io::Write;
     let _ = std::fs::create_dir_all(config_dir());
@@ -41,14 +40,13 @@ pub fn log(msg: &str) {
     }
 }
 
-/// Charge la config, la crée avec les valeurs par défaut au premier lancement.
-/// Le second élément est un message d'erreur si le fichier existe mais est illisible.
+/// Writes the default template on first run. The error is set only when the file exists but cannot be parsed.
 pub fn load() -> (Config, Option<String>) {
     let path = config_path();
     match std::fs::read_to_string(&path) {
         Ok(text) => match toml::from_str(&text) {
             Ok(c) => (c, None),
-            Err(e) => (Config::default(), Some(format!("config.toml illisible ({})", e.message()))),
+            Err(e) => (Config::default(), Some(format!("invalid config.toml ({})", e.message()))),
         },
         Err(_) => {
             let _ = std::fs::create_dir_all(config_dir());
@@ -58,24 +56,23 @@ pub fn load() -> (Config, Option<String>) {
     }
 }
 
-/// Analyse et valide un raccourci. Retourne un message d'erreur lisible sinon.
 pub fn parse_hotkey(spec: &str) -> Result<HotKey, String> {
     let normalized = normalize(spec);
-    let hk: HotKey = normalized.parse().map_err(|e| format!("raccourci « {spec} » invalide ({e})"))?;
+    let hk: HotKey = normalized.parse().map_err(|e| format!("invalid hotkey \"{spec}\" ({e})"))?;
     let m = hk.mods;
     if cfg!(windows) && m.contains(Modifiers::CONTROL) && m.contains(Modifiers::ALT) {
-        return Err("Ctrl+Alt est interdit (conflit AltGr sur AZERTY)".into());
+        return Err("Ctrl+Alt is not allowed (conflicts with AltGr on AZERTY layouts)".into());
     }
     if m == (Modifiers::CONTROL | Modifiers::SHIFT) && hk.key == Code::KeyV {
-        return Err("Ctrl+Maj+V est réservé (collage sans format de Thunderbird)".into());
+        return Err("Ctrl+Shift+V is reserved (Thunderbird's paste as plain text)".into());
     }
     if m.is_empty() {
-        return Err("au moins un modificateur est requis".into());
+        return Err("at least one modifier is required".into());
     }
     Ok(hk)
 }
 
-/// Rend les noms plus tolérants : "Win" -> "super", lettre seule -> "KeyX", chiffre -> "DigitN".
+/// Accepts friendlier names than global-hotkey: "Win" -> "super", single letter -> "KeyX", digit -> "DigitN".
 fn normalize(spec: &str) -> String {
     spec.split('+')
         .map(|t| {
