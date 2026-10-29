@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2021"
 description = "Convertit le Markdown du presse-papiers en HTML riche et le colle (Win+Alt+V)"
 license = "MIT"
+repository = "https://github.com/shaffe-fr/clip-md-html"
+readme = "README.md"
+keywords = ["markdown", "clipboard", "html", "tray", "hotkey"]
+categories = ["command-line-utilities", "text-processing"]
+rust-version = "1.90"
 
 [dependencies]
 pulldown-cmark = { version = "=0.13.5", default-features = false, features = ["html"] }
