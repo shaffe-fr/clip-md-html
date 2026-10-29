@@ -16,6 +16,9 @@ root.geometry("200x100+0+0")
 def on_paste(_event):
     try:
         html = root.clipboard_get(type="text/html")
+        # Tk hands non-text targets back as "0x3c 0x68 ..." hex bytes.
+        if html.startswith("0x"):
+            html = bytes(int(b, 16) for b in html.split()).decode("utf-8")
     except tkinter.TclError as e:
         html = "ERROR: %s" % e
     with open(out + "/pasted.html", "w") as f:
