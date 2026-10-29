@@ -42,14 +42,18 @@ pub fn log(msg: &str) {
 }
 
 /// Charge la config, la crée avec les valeurs par défaut au premier lancement.
-pub fn load() -> Config {
+/// Le second élément est un message d'erreur si le fichier existe mais est illisible.
+pub fn load() -> (Config, Option<String>) {
     let path = config_path();
     match std::fs::read_to_string(&path) {
-        Ok(text) => toml::from_str(&text).unwrap_or_default(),
+        Ok(text) => match toml::from_str(&text) {
+            Ok(c) => (c, None),
+            Err(e) => (Config::default(), Some(format!("config.toml illisible ({})", e.message()))),
+        },
         Err(_) => {
             let _ = std::fs::create_dir_all(config_dir());
             let _ = std::fs::write(&path, template());
-            Config::default()
+            (Config::default(), None)
         }
     }
 }
