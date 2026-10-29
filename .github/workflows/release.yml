@@ -107,9 +107,37 @@ jobs:
           path: ${{ env.ARCHIVE }}
           if-no-files-found: error
 
+  linux:
+    name: Build Linux ${{ matrix.arch }}
+    needs: version
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      ARCHIVE: clip-md-html-${{ needs.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo build --release --locked
+      - name: Package
+        run: |
+          mkdir stage
+          cp target/release/clip-md-html LICENSE README.md stage/
+          tar -czf "$ARCHIVE" -C stage .
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-linux-${{ matrix.arch }}
+          path: ${{ env.ARCHIVE }}
+          if-no-files-found: error
   release:
     name: Publish release
-    needs: [version, windows, macos]
+    needs: [version, windows, macos, linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write

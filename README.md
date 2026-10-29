@@ -3,13 +3,13 @@
 [![CI](https://github.com/shaffe-fr/clip-md-html/actions/workflows/ci.yml/badge.svg)](https://github.com/shaffe-fr/clip-md-html/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/shaffe-fr/clip-md-html)](https://github.com/shaffe-fr/clip-md-html/releases/latest)
 
-Tray app for Windows and macOS: press a global hotkey and the Markdown in the clipboard is converted to HTML and pasted as rich text. Built for copying raw Markdown from an AI assistant or editor into Thunderbird or any rich-text editor.
+Tray app for Windows and macOS (CLI on Linux): press a global hotkey and the Markdown in the clipboard is converted to HTML and pasted as rich text. Built for copying raw Markdown from an AI assistant or editor into Thunderbird or any rich-text editor.
 
 The HTML is semantic and unstyled, so the target applies its own defaults. Tables, strikethrough and task lists are supported. The original Markdown stays on the clipboard as the plain-text flavor.
 
 ## Install
 
-Download the [latest release](https://github.com/shaffe-fr/clip-md-html/releases/latest): `clip-md-html-<version>-windows-x86_64.zip` or `clip-md-html-<version>-macos-universal.tar.gz`, checksums in `SHA256SUMS.txt`.
+Download the [latest release](https://github.com/shaffe-fr/clip-md-html/releases/latest): `clip-md-html-<version>-windows-x86_64.zip`, `clip-md-html-<version>-macos-universal.tar.gz`, `clip-md-html-<version>-linux-x86_64.tar.gz` or `clip-md-html-<version>-linux-aarch64.tar.gz`, checksums in `SHA256SUMS.txt`.
 
 From source:
 
@@ -30,6 +30,8 @@ Tray menu: Convert now (convert without pasting), Start with Windows / Start at 
 
 `clip-md-html --once` converts the clipboard and exits without pasting. Exit code 1 if the clipboard is empty or not text.
 
+On Linux there is no tray icon, hotkey or config file; see [Linux](#linux).
+
 ## Configuration
 
 Created on first run:
@@ -43,9 +45,51 @@ hotkey = "Win+Alt+V"   # macOS: "Cmd+Alt+V"
 
 Modifiers: `Win`/`Cmd`, `Alt`/`Option`, `Ctrl`, `Shift`. Restart the app after editing. `Ctrl+Alt` (AltGr on AZERTY, rejected on Windows) and `Ctrl+Shift+V` (Thunderbird's paste as plain text) are rejected. A notification reports an invalid or already-taken hotkey. The log, `clip-md-html.log`, lives in the same directory.
 
+## Linux
+
+CLI only: no tray icon, no built-in hotkey, no autostart. You bind a command to a keyboard shortcut in your desktop environment.
+
+```sh
+clip-md-html --once    # convert the clipboard
+clip-md-html --paste   # convert, then send Ctrl+V
+```
+
+Running it without arguments prints a usage hint and exits with status 2.
+
+The Linux clipboard only lives as long as the program that owns it. `--once` therefore starts a detached background copy of itself that serves the HTML (`text/html`) and the Markdown (plain text) until another application copies something, then exits. The command itself returns right away. On Wayland it uses the `wlr-data-control` protocol (sway, Hyprland, other wlroots compositors; recent KDE Plasma should work too). GNOME's Mutter does not implement it, so there the X11 clipboard through XWayland is used as a fallback, which is untested (see below).
+
+`--paste` then simulates Ctrl+V with the first available tool, chosen from `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY` and `DISPLAY`:
+
+| Session | Tools, in order       |
+|---------|-----------------------|
+| Wayland | `wtype`, `ydotool`    |
+| X11     | `xdotool`, `ydotool`  |
+
+If none is installed the clipboard is still converted, an error is printed and you paste manually. `ydotool` needs its `ydotoold` daemon and access to `/dev/uinput`, which this program does not set up. Prefer `wtype` on Wayland (wlroots compositors, KDE) and `xdotool` on X11. `wtype` does not work on GNOME Wayland.
+
+Bind a shortcut (use the absolute path if the binary is not in the desktop's `PATH`). Avoid `Ctrl+Shift+V` (Thunderbird's paste as plain text); `Super+Alt+V` is a good default.
+
+- GNOME: Settings > Keyboard > Keyboard Shortcuts > Custom Shortcuts > add, command `clip-md-html --paste`.
+- KDE Plasma: System Settings > Keyboard > Shortcuts > Add New > Command or Script, command `clip-md-html --paste`.
+- Sway (`~/.config/sway/config`): `bindsym $mod+Mod1+v exec clip-md-html --paste`
+- Hyprland (`~/.config/hypr/hyprland.conf`): `bind = SUPER ALT, V, exec, clip-md-html --paste`
+- X11 window managers: bind the same command in the WM, or with `xbindkeys` / `sxhkd`.
+
+Use `--once` instead of `--paste` if you prefer to paste yourself. When the shortcut is still held while the keystroke is sent, `xdotool` is run with `--clearmodifiers`; `wtype` and `ydotool` do not do that, so a binding on a released key combination (or `--once`) is more reliable there.
+
+### What is tested
+
+CI (Ubuntu) builds, runs clippy and the unit tests, and runs end-to-end jobs against a real clipboard:
+
+- X11 under Xvfb with `xclip`: `--once` returns promptly, `text/html` is offered with the expected tags and no `style=`, the plain text is still the Markdown, the holder outlives the command and exits when another client takes the clipboard.
+- Wayland under headless sway with `wl-clipboard`: same assertions.
+- `--paste` under Xvfb with `xdotool`: a Tk window receives Ctrl+V and reads the `text/html` flavor.
+
+Not tested: GNOME and KDE on Wayland (compositor support for the data-control protocol, shortcut binding), `wtype` and `ydotool` on a real compositor, pasting into Thunderbird or another real application, and the `linux-aarch64` build beyond compiling.
+
 ## Autostart
 
-Opt-in from the tray menu.
+Opt-in from the tray menu (Windows and macOS only).
 
 - Windows: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
 - macOS: `~/Library/LaunchAgents/fr.shaffe.clip-md-html.plist`, effective at next login
@@ -71,7 +115,7 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-CI builds and tests on Windows and macOS. Pushing a `v*` tag publishes a release.
+CI builds and tests on Windows, macOS and Linux, plus Linux clipboard end-to-end jobs. Pushing a `v*` tag publishes a release.
 
 ## Contributing
 

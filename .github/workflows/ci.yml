@@ -1,19 +1,16 @@
 name: CI
-
 on:
   push:
     branches: [main]
   pull_request:
-
 permissions:
   contents: read
-
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -24,3 +21,40 @@ jobs:
       - run: cargo build --release
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+  e2e-x11:
+    name: e2e Linux X11
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb xclip xdotool python3-tk
+      - run: cargo build --release
+      - name: --once under Xvfb
+        run: xvfb-run -a .github/scripts/e2e-linux.sh x11
+      - name: --paste under Xvfb with xdotool
+        run: xvfb-run -a .github/scripts/e2e-paste-x11.sh
+  e2e-wayland:
+    name: e2e Linux Wayland (headless sway)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends sway wl-clipboard
+      - run: cargo build --release
+      - name: --once under headless sway
+        run: |
+          export XDG_RUNTIME_DIR=$(mktemp -d)
+          chmod 700 "$XDG_RUNTIME_DIR"
+          export WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 WLR_RENDERER=pixman
+          unset DISPLAY
+          sway --unsupported-gpu > "$RUNNER_TEMP/sway.log" 2>&1 &
+          for _ in $(seq 1 50); do
+            sock=$(find "$XDG_RUNTIME_DIR" -maxdepth 1 -name 'wayland-*' ! -name '*.lock' | head -n1)
+            [ -n "$sock" ] && break
+            sleep 0.2
+          done
+          [ -n "$sock" ] || { cat "$RUNNER_TEMP/sway.log"; exit 1; }
+          export WAYLAND_DISPLAY=$(basename "$sock") XDG_SESSION_TYPE=wayland
+          .github/scripts/e2e-linux.sh wayland || { cat "$RUNNER_TEMP/sway.log"; exit 1; }
