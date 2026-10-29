@@ -2,91 +2,78 @@
 
 [![CI](https://github.com/shaffe-fr/clip-md-html/actions/workflows/ci.yml/badge.svg)](https://github.com/shaffe-fr/clip-md-html/actions/workflows/ci.yml)
 
-Petit utilitaire de barre d'état (Windows et macOS) qui transforme le Markdown du presse-papiers en HTML riche, puis le colle. Idéal pour copier du Markdown généré par Kiro (ou un autre outil) et le coller mis en forme dans Thunderbird, sans le style de l'éditeur d'origine.
+Tray app for Windows and macOS: press a global hotkey and the Markdown in the clipboard is converted to HTML and pasted as rich text. Built for copying raw Markdown from an AI assistant or editor into Thunderbird or any rich-text editor.
 
-Le HTML produit est sémantique et sans CSS : Thunderbird applique son style par défaut. Tableaux, texte barré et listes de tâches sont gérés.
+The HTML is semantic and unstyled, so the target applies its own defaults. Tables, strikethrough and task lists are supported. The original Markdown stays on the clipboard as the plain-text flavor.
 
-## Installation
-
-Depuis les sources (Rust stable requis) :
+## Install
 
 ```sh
 cargo install --path .
 ```
 
-Ou téléchargez un binaire depuis la page [Releases](https://github.com/shaffe-fr/clip-md-html/releases) et placez-le où vous voulez.
+Or grab a binary from [Releases](https://github.com/shaffe-fr/clip-md-html/releases).
 
-## Utilisation
+## Usage
 
-1. Copiez le Markdown (par exemple depuis Kiro).
-2. Placez le curseur dans la fenêtre de destination (corps d'un mail Thunderbird).
-3. Appuyez sur le raccourci : le presse-papiers est converti puis collé automatiquement.
+Copy Markdown, focus the target (e.g. a Thunderbird compose window), press the hotkey.
 
-| Système | Raccourci par défaut |
-|---------|----------------------|
-| Windows | `Win+Alt+V` |
+| OS      | Default hotkey |
+|---------|----------------|
+| Windows | `Win+Alt+V`    |
 | macOS   | `Cmd+Option+V` |
 
-Le Markdown d'origine reste disponible en texte brut dans le presse-papiers (collage « sans format » possible).
+Tray menu: Convert now (convert without pasting), Start with Windows / Start at login, Quit. Only one instance runs at a time.
 
-Menu de l'icône : « Convertir maintenant » (convertit sans coller), « Démarrer avec Windows » (démarrage à l'ouverture de session sur macOS) et « Quitter ». Une seule instance tourne à la fois.
-
-### Mode ponctuel
-
-```sh
-clip-md-html --once
-```
-
-Convertit le presse-papiers en HTML puis quitte, sans simuler de collage. Code de sortie 1 si le presse-papiers est vide ou non textuel.
+`clip-md-html --once` converts the clipboard and exits without pasting. Exit code 1 if the clipboard is empty or not text.
 
 ## Configuration
 
-Fichier créé au premier lancement :
+Created on first run:
 
-- Windows : `%APPDATA%\clip-md-html\config.toml`
-- macOS : `~/Library/Application Support/clip-md-html/config.toml`
+- Windows: `%APPDATA%\clip-md-html\config.toml`
+- macOS: `~/Library/Application Support/clip-md-html/config.toml`
 
 ```toml
-hotkey = "Win+Alt+V"   # macOS : "Cmd+Alt+V"
+hotkey = "Win+Alt+V"   # macOS: "Cmd+Alt+V"
 ```
 
-Modificateurs : `Win`/`Cmd`, `Alt`/`Option`, `Ctrl`, `Shift`. Redémarrez l'application après modification. Éviter `Ctrl+Alt` (AltGr sur clavier AZERTY, refusé sous Windows) et `Ctrl+Maj+V` (collage sans format de Thunderbird, refusé). Si le raccourci est déjà pris, une notification l'indique. Un journal `clip-md-html.log` se trouve dans le même dossier.
+Modifiers: `Win`/`Cmd`, `Alt`/`Option`, `Ctrl`, `Shift`. Restart the app after editing. `Ctrl+Alt` (AltGr on AZERTY, rejected on Windows) and `Ctrl+Shift+V` (Thunderbird's paste as plain text) are rejected. A notification reports an invalid or already-taken hotkey. The log, `clip-md-html.log`, lives in the same directory.
 
-## Démarrage automatique
+## Autostart
 
-- Windows : case « Démarrer avec Windows » du menu (clé `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`).
-- macOS : même case, qui crée `~/Library/LaunchAgents/fr.shaffe.clip-md-html.plist` (actif à la prochaine session).
+Opt-in from the tray menu.
 
-## macOS : autorisation Accessibilité
+- Windows: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
+- macOS: `~/Library/LaunchAgents/fr.shaffe.clip-md-html.plist`, effective at next login
 
-Pour simuler `Cmd+V`, macOS exige l'autorisation Accessibilité. Ouvrez Réglages Système > Confidentialité et sécurité > Accessibilité, ajoutez et activez `clip-md-html` (ou le terminal qui le lance), puis relancez l'application. Sans elle, le contenu est converti mais vous devez coller vous-même avec `Cmd+V` ; une notification vous le rappelle. L'application n'a pas d'icône dans le Dock, seulement dans la barre de menus.
+## macOS Accessibility permission
 
+Simulating `Cmd+V` requires System Settings > Privacy & Security > Accessibility. Enable `clip-md-html` (or the terminal launching it) and restart the app. Without it the clipboard is still converted and a notification asks you to paste manually. The app has a menu bar icon and no Dock icon.
 
 ## Antivirus
 
-L'exécutable n'est pas encore signé (voir ci-dessous) et associe un raccourci global, un collage simulé (`SendInput` / `CGEvent`), le presse-papiers et un démarrage automatique optionnel : certains antivirus (heuristiques) peuvent donc le signaler à tort. Ce que fait réellement le programme : il enregistre un seul raccourci via `RegisterHotKey`, sans hook clavier ni lecture de l'état des touches, n'écrit rien en dehors de sa configuration, ne télécharge rien et ne se copie nulle part. Le démarrage automatique n'est activé que si vous cochez la case dans le menu. Le code source est ouvert et l'exécutable embarque ses métadonnées (nom, description, version) et un manifeste sans élévation.
+A global hotkey, simulated paste (`SendInput` / `CGEvent`) and optional autostart in an unsigned binary can trigger heuristic false positives. The app registers one hotkey with `RegisterHotKey`, uses no keyboard hook, never reads key state, writes only to its config directory and makes no network requests. The Windows exe embeds version metadata and an `asInvoker` manifest. During development you can exclude `target/`.
 
-Pendant le développement, vous pouvez ajouter une exclusion pour le dossier `target/` du dépôt.
+## Code signing
 
-## Signature du code
+- Windows: signing through SignPath Foundation will be requested after the first release. Until then binaries are unsigned and SmartScreen may warn.
+- macOS: unsigned. After download, run `xattr -d com.apple.quarantine ./clip-md-html`.
 
-- Windows : la signature par SignPath Foundation (service gratuit pour les projets open source) sera demandée après la première release. Tant qu'elle n'est pas active, les binaires Windows ne sont pas signés et SmartScreen peut afficher un avertissement.
-- macOS : les binaires ne sont pas signés pour l'instant (l'Apple Developer Program est payant). Après téléchargement, retirez la quarantaine avec `xattr -d com.apple.quarantine ./clip-md-html`, ou faites un clic droit sur le fichier puis « Ouvrir ».
-
-## Développement
+## Development
 
 ```sh
 cargo build --release
-cargo clippy -- -D warnings
+cargo clippy --all-targets -- -D warnings
 cargo test
 ```
 
-La CI GitHub Actions construit et teste sous Windows et macOS. Une release est publiée à chaque tag `v*`.
+CI builds and tests on Windows and macOS. Pushing a `v*` tag publishes a release.
 
-## Contribuer
+## Contributing
 
-Les issues et pull requests sont les bienvenues. Lancez `cargo clippy -- -D warnings` et `cargo test` avant de proposer une modification. Vulnérabilité : voir [SECURITY.md](SECURITY.md).
+Issues and pull requests are welcome; run clippy and the tests first. For vulnerabilities, see [SECURITY.md](SECURITY.md).
 
-## Licence
+## License
 
 MIT

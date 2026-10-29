@@ -1,3 +1,3 @@
-# Politique de sécurité
+# Security policy
 
-Pour signaler une vulnérabilité, utilisez les « security advisories » privées de GitHub (onglet Security > Report a vulnerability du dépôt). Merci de ne pas ouvrir d'issue publique pour ce type de problème.
+Report vulnerabilities privately through GitHub security advisories (Security > Report a vulnerability). Do not open a public issue.
