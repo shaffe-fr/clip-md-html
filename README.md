@@ -1,6 +1,7 @@
 # clip-md-html
 
 [![CI](https://github.com/shaffe-fr/clip-md-html/actions/workflows/ci.yml/badge.svg)](https://github.com/shaffe-fr/clip-md-html/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/shaffe-fr/clip-md-html)](https://github.com/shaffe-fr/clip-md-html/releases/latest)
 
 Tray app for Windows and macOS: press a global hotkey and the Markdown in the clipboard is converted to HTML and pasted as rich text. Built for copying raw Markdown from an AI assistant or editor into Thunderbird or any rich-text editor.
 
@@ -8,11 +9,13 @@ The HTML is semantic and unstyled, so the target applies its own defaults. Table
 
 ## Install
 
+Download the [latest release](https://github.com/shaffe-fr/clip-md-html/releases/latest): `clip-md-html-<version>-windows-x86_64.zip` or `clip-md-html-<version>-macos-universal.tar.gz`, checksums in `SHA256SUMS.txt`.
+
+From source:
+
 ```sh
 cargo install --path .
 ```
-
-Or grab a binary from [Releases](https://github.com/shaffe-fr/clip-md-html/releases).
 
 ## Usage
 
