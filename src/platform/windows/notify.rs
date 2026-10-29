@@ -3,12 +3,12 @@ use std::ptr::null_mut;
 use windows_sys::Win32::UI::Shell::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
-pub const TIMER_ID: usize = 0xC11B;
 const UID: u32 = 42;
 
 pub struct Notifier {
     hwnd: isize,
     active: bool,
+    timer: usize,
 }
 
 fn fill(dst: &mut [u16], s: &str) {
@@ -24,7 +24,7 @@ impl Notifier {
         let hwnd = unsafe {
             CreateWindowExW(0, class.as_ptr(), class.as_ptr(), 0, 0, 0, 0, 0, null_mut(), null_mut(), null_mut(), null_mut())
         };
-        Self { hwnd: hwnd as isize, active: false }
+        Self { hwnd: hwnd as isize, active: false, timer: 0 }
     }
 
     fn data(&self) -> NOTIFYICONDATAW {
@@ -48,9 +48,14 @@ impl Notifier {
         unsafe {
             if Shell_NotifyIconW(NIM_ADD, &d) != 0 {
                 self.active = true;
-                SetTimer(null_mut(), TIMER_ID, 7000, None);
+                self.timer = SetTimer(null_mut(), 0, 7000, None);
             }
         }
+    }
+
+    /// Vrai si `id` est le timer de nettoyage en cours (l'ID est attribué par SetTimer).
+    pub fn owns_timer(&self, id: usize) -> bool {
+        self.timer != 0 && self.timer == id
     }
 
     pub fn cleanup(&mut self) {
@@ -58,9 +63,12 @@ impl Notifier {
             let d = self.data();
             unsafe {
                 Shell_NotifyIconW(NIM_DELETE, &d);
-                KillTimer(null_mut(), TIMER_ID);
+                if self.timer != 0 {
+                    KillTimer(null_mut(), self.timer);
+                }
             }
             self.active = false;
+            self.timer = 0;
         }
     }
 }

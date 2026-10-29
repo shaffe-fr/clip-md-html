@@ -47,7 +47,7 @@ pub fn run() {
         if r <= 0 {
             return;
         }
-        if msg.message == WM_TIMER && msg.hwnd.is_null() && msg.wParam == notify::TIMER_ID {
+        if msg.message == WM_TIMER && msg.hwnd.is_null() && app.notifier.owns_timer(msg.wParam) {
             app.notifier.cleanup();
             continue;
         }

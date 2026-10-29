@@ -109,7 +109,12 @@ fn autostart_label() -> &'static str {
 }
 
 fn register_hotkey(notifier: &mut Notifier) -> Option<GlobalHotKeyManager> {
-    let cfg = config::load();
+    let (cfg, cfg_err) = config::load();
+    if let Some(e) = cfg_err {
+        let msg = format!("{e}. Raccourci par défaut ({}) utilisé. Config : {}", config::DEFAULT_HOTKEY, config::config_path().display());
+        log(&msg);
+        notifier.show("clip-md-html : configuration", &msg);
+    }
     let hotkey = match config::parse_hotkey(&cfg.hotkey) {
         Ok(h) => h,
         Err(e) => {
