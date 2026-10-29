@@ -64,11 +64,13 @@ Pour simuler `Cmd+V`, macOS exige l'autorisation Accessibilité. Ouvrez Réglage
 
 ## Antivirus
 
-Combiné à l'absence de signature sur macOS (voir ci-dessous), l'exécutable combine un raccourci global, un collage simulé (`SendInput` / `CGEvent`), le presse-papiers et un démarrage automatique optionnel : certains antivirus (heuristiques) peuvent donc le signaler à tort. Ce que fait réellement le programme : il enregistre un seul raccourci via `RegisterHotKey`, sans hook clavier ni lecture de l'état des touches, n'écrit rien en dehors de sa configuration, ne télécharge rien et ne se copie nulle part. Le démarrage automatique n'est activé que si vous cochez la case dans le menu. Le code source est ouvert et l'exécutable embarque ses métadonnées (nom, description, version) et un manifeste sans élévation.
+L'exécutable n'est pas encore signé (voir ci-dessous) et associe un raccourci global, un collage simulé (`SendInput` / `CGEvent`), le presse-papiers et un démarrage automatique optionnel : certains antivirus (heuristiques) peuvent donc le signaler à tort. Ce que fait réellement le programme : il enregistre un seul raccourci via `RegisterHotKey`, sans hook clavier ni lecture de l'état des touches, n'écrit rien en dehors de sa configuration, ne télécharge rien et ne se copie nulle part. Le démarrage automatique n'est activé que si vous cochez la case dans le menu. Le code source est ouvert et l'exécutable embarque ses métadonnées (nom, description, version) et un manifeste sans élévation.
 
 Pendant le développement, vous pouvez ajouter une exclusion pour le dossier `target/` du dépôt.
+
 ## Signature du code
-- Windows : la signature par SignPath Foundation (service gratuit pour les projets open source) est demandée et en attente d'approbation. Tant qu'elle n'est pas active, les binaires Windows ne sont pas signés et SmartScreen peut afficher un avertissement.
+
+- Windows : la signature par SignPath Foundation (service gratuit pour les projets open source) sera demandée après la première release. Tant qu'elle n'est pas active, les binaires Windows ne sont pas signés et SmartScreen peut afficher un avertissement.
 - macOS : les binaires ne sont pas signés pour l'instant (l'Apple Developer Program est payant). Après téléchargement, retirez la quarantaine avec `xattr -d com.apple.quarantine ./clip-md-html`, ou faites un clic droit sur le fichier puis « Ouvrir ».
 
 ## Développement
@@ -82,6 +84,7 @@ cargo test
 La CI GitHub Actions construit et teste sous Windows et macOS. Une release est publiée à chaque tag `v*`.
 
 ## Contribuer
+
 Les issues et pull requests sont les bienvenues. Lancez `cargo clippy -- -D warnings` et `cargo test` avant de proposer une modification. Vulnérabilité : voir [SECURITY.md](SECURITY.md).
 
 ## Licence
