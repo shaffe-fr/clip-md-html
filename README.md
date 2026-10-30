@@ -65,25 +65,30 @@ The Linux clipboard only lives as long as the program that owns it. `--once` the
 | Wayland | `wtype`, `ydotool`    |
 | X11     | `xdotool`, `ydotool`  |
 
-If none is installed the clipboard is still converted, an error is printed and you paste manually. `ydotool` needs its `ydotoold` daemon and access to `/dev/uinput`, which this program does not set up. Prefer `wtype` on Wayland (wlroots compositors, KDE) and `xdotool` on X11. `wtype` does not work on GNOME Wayland.
+If a tool is installed but fails (for example `wtype` on GNOME Wayland, which lacks the virtual-keyboard protocol), the next one is tried; an error listing every attempt is printed only when all of them fail. In both cases the clipboard is still converted and you paste manually. If none is installed, the error says which to install. `ydotool` needs its `ydotoold` daemon and access to `/dev/uinput`, which this program does not set up. `ydotool` is called with the 1.x syntax (evdev keycodes) first, then with the 0.1.x syntax (`key ctrl+v`) if that fails. Prefer `wtype` on Wayland (wlroots compositors, KDE) and `xdotool` on X11. `wtype` does not work on GNOME Wayland.
 
 Bind a shortcut (use the absolute path if the binary is not in the desktop's `PATH`). Avoid `Ctrl+Shift+V` (Thunderbird's paste as plain text); `Super+Alt+V` is a good default.
 
 - GNOME: Settings > Keyboard > Keyboard Shortcuts > Custom Shortcuts > add, command `clip-md-html --paste`.
 - KDE Plasma: System Settings > Keyboard > Shortcuts > Add New > Command or Script, command `clip-md-html --paste`.
-- Sway (`~/.config/sway/config`): `bindsym $mod+Mod1+v exec clip-md-html --paste`
-- Hyprland (`~/.config/hypr/hyprland.conf`): `bind = SUPER ALT, V, exec, clip-md-html --paste`
+- Sway (`~/.config/sway/config`): `bindsym --release $mod+Mod1+v exec clip-md-html --paste`
+- Hyprland (`~/.config/hypr/hyprland.conf`): `bindr = SUPER ALT, V, exec, clip-md-html --paste`
 - X11 window managers: bind the same command in the WM, or with `xbindkeys` / `sxhkd`.
 
-Use `--once` instead of `--paste` if you prefer to paste yourself. When the shortcut is still held while the keystroke is sent, `xdotool` is run with `--clearmodifiers`; `wtype` and `ydotool` do not do that, so a binding on a released key combination (or `--once`) is more reliable there.
+Use `--once` instead of `--paste` if you prefer to paste yourself. Before Ctrl+V, every tool is told to release Super, Alt, Shift and Ctrl (`xdotool keyup` plus `--clearmodifiers`, `wtype -m`, `ydotool` key-up codes), but on Wayland the compositor still sees the physical keys as held, so prefer release-triggered bindings (`bindsym --release` in Sway, `bindr` in Hyprland). GNOME and KDE have no release-triggered custom shortcuts: if the paste lands as another shortcut, use `--once` and press Ctrl+V yourself.
+
+Requirements: the Linux binaries are built on Ubuntu 22.04 and need glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36 and later). CI prints the highest `GLIBC_` symbol version the binary requires and fails above 2.35.
+
+If the background holder fails to start (no clipboard access, for example), its stderr is included in the error message.
 
 ### What is tested
 
-CI (Ubuntu) builds, runs clippy and the unit tests, and runs end-to-end jobs against a real clipboard:
+CI (Ubuntu 22.04, x86_64 and aarch64) builds, runs clippy and the unit tests, and runs end-to-end jobs against a real clipboard:
 
 - X11 under Xvfb with `xclip`: `--once` returns promptly, `text/html` is offered with the expected tags and no `style=`, the plain text is still the Markdown, the holder outlives the command and exits when another client takes the clipboard.
 - Wayland under headless sway with `wl-clipboard`: same assertions.
 - `--paste` under Xvfb with `xdotool`: a Tk window receives Ctrl+V and reads the `text/html` flavor.
+- `--paste` with a fake failing `wtype` ahead of a fake `ydotool` on `PATH`: it falls through, and reports every attempt when all fail.
 
 Not tested: GNOME and KDE on Wayland (compositor support for the data-control protocol, shortcut binding), `wtype` and `ydotool` on a real compositor, pasting into Thunderbird or another real application, and the `linux-aarch64` build beyond compiling.
 

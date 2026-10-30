@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [windows-latest, macos-latest, ubuntu-22.04, ubuntu-22.04-arm]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -21,6 +21,12 @@ jobs:
       - run: cargo build --release
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+      - name: Highest GLIBC symbol version required
+        if: runner.os == 'Linux'
+        run: |
+          max=$(objdump -T target/release/clip-md-html | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -V | tail -n1)
+          echo "max GLIBC_$max"
+          [ "$(printf '%s\n2.35\n' "$max" | sort -V | tail -n1)" = 2.35 ] || { echo "requires glibc newer than 2.35" >&2; exit 1; }
   e2e-x11:
     name: e2e Linux X11
     runs-on: ubuntu-latest
@@ -34,6 +40,8 @@ jobs:
         run: xvfb-run -a .github/scripts/e2e-linux.sh x11
       - name: --paste under Xvfb with xdotool
         run: xvfb-run -a .github/scripts/e2e-paste-x11.sh
+      - name: --paste falls through a failing tool
+        run: xvfb-run -a .github/scripts/e2e-fallback.sh
   e2e-wayland:
     name: e2e Linux Wayland (headless sway)
     runs-on: ubuntu-latest

@@ -114,9 +114,9 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            runner: ubuntu-latest
+            runner: ubuntu-22.04
           - arch: aarch64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-22.04-arm
     runs-on: ${{ matrix.runner }}
     env:
       ARCHIVE: clip-md-html-${{ needs.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz
@@ -125,6 +125,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - run: cargo build --release --locked
+      - name: Highest GLIBC symbol version required
+        run: objdump -T target/release/clip-md-html | grep -o 'GLIBC_[0-9.]*' | sort -V | tail -n1
       - name: Package
         run: |
           mkdir stage

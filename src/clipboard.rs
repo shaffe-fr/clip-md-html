@@ -43,7 +43,7 @@ pub fn convert_clipboard() -> Result<(), String> {
         .arg(HOLD_ARG)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .process_group(0) // own group: survives the caller's terminal or service teardown
         .spawn()
         .map_err(|e| format!("could not start the clipboard holder: {e}"))?;
@@ -55,14 +55,29 @@ pub fn convert_clipboard() -> Result<(), String> {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     while std::time::Instant::now() < deadline {
         if matches!(child.try_wait(), Ok(Some(_))) {
-            return Err("the clipboard holder exited early".into());
+            return Err(holder_failure(&mut child, "the clipboard holder exited early"));
         }
         if cb.get().html().is_ok_and(|h| h == html) {
             return Ok(());
         }
         std::thread::sleep(std::time::Duration::from_millis(20));
     }
-    Err("the clipboard holder did not take ownership in time".into())
+    // Still running without owning the clipboard: stop it so it does not linger, then report.
+    let _ = child.kill();
+    let _ = child.wait();
+    Err(holder_failure(&mut child, "the clipboard holder did not take ownership in time"))
+}
+
+/// Appends whatever the (finished) holder wrote to stderr to the error message.
+#[cfg(target_os = "linux")]
+fn holder_failure(child: &mut std::process::Child, msg: &str) -> String {
+    use std::io::Read;
+    let mut stderr = String::new();
+    if let Some(mut pipe) = child.stderr.take() {
+        let _ = pipe.read_to_string(&mut stderr);
+    }
+    let stderr = stderr.trim();
+    if stderr.is_empty() { msg.to_string() } else { format!("{msg}: {stderr}") }
 }
 
 /// Child side of `convert_clipboard`: reads the Markdown from stdin, publishes it and blocks
