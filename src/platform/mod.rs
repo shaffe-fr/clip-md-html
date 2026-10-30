@@ -1,5 +1,5 @@
 //! OS backends. Windows and macOS expose the resident-app interface:
-//! `DEFAULT_HOTKEY`, `config_dir`, `single_instance`, `paste`, `paste_permission_problem`,
+//! `DEFAULT_HOTKEY`, `single_instance`, `paste`, `paste_permission_problem`,
 //! `autostart`, `Notifier`, `run`. Linux is CLI-only and exposes just `paste`.
 #[cfg(windows)]
 mod windows;

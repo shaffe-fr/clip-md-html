@@ -30,20 +30,27 @@ Tray menu: Convert now (convert without pasting), Start with Windows / Start at 
 
 `clip-md-html --once` converts the clipboard and exits without pasting. Exit code 1 if the clipboard is empty or not text.
 
-On Linux there is no tray icon, hotkey or config file; see [Linux](#linux).
+On Linux there is no tray icon, hotkey or required config file; see [Linux](#linux).
 
 ## Configuration
 
-Created on first run:
+Created on first run, on every OS, at `$XDG_CONFIG_HOME/clip-md-html/config.toml` when `XDG_CONFIG_HOME` is set to an absolute path, otherwise `~/.config/clip-md-html/config.toml`:
+- Windows: `%USERPROFILE%\.config\clip-md-html\config.toml`
+- macOS: `~/.config/clip-md-html/config.toml`
+- Linux: same path; the CLI reads nothing from it and needs no config.
 
-- Windows: `%APPDATA%\clip-md-html\config.toml`
-- macOS: `~/Library/Application Support/clip-md-html/config.toml`
+Upgrading: if the new file does not exist, the config from the old location (`%APPDATA%\clip-md-html\config.toml` on Windows, `~/Library/Application Support/clip-md-html/config.toml` on macOS) is copied there at startup. The old file is left in place and no longer used; if both exist, the new one wins and the log notes it.
 
 ```toml
 hotkey = "Win+Alt+V"   # macOS: "Cmd+Alt+V"
 ```
 
-Modifiers: `Win`/`Cmd`, `Alt`/`Option`, `Ctrl`, `Shift`. Restart the app after editing. `Ctrl+Alt` (AltGr on AZERTY, rejected on Windows) and `Ctrl+Shift+V` (Thunderbird's paste as plain text) are rejected. A notification reports an invalid or already-taken hotkey. The log, `clip-md-html.log`, lives in the same directory.
+Modifiers: `Win`/`Cmd`, `Alt`/`Option`, `Ctrl`, `Shift`. Restart the app after editing. `Ctrl+Alt` (AltGr on AZERTY, rejected on Windows) and `Ctrl+Shift+V` (Thunderbird's paste as plain text) are rejected. A notification reports an invalid or already-taken hotkey. 
+
+The log, `clip-md-html.log`, is state rather than config:
+- Windows: `%LOCALAPPDATA%\clip-md-html\clip-md-html.log`
+- macOS: `~/Library/Logs/clip-md-html/clip-md-html.log`
+- Linux: no log file; errors go to stderr.
 
 ## Linux
 
@@ -105,7 +112,7 @@ Simulating `Cmd+V` requires System Settings > Privacy & Security > Accessibility
 
 ## Antivirus
 
-A global hotkey, simulated paste (`SendInput` / `CGEvent`) and optional autostart in an unsigned binary can trigger heuristic false positives. The app registers one hotkey with `RegisterHotKey`, uses no keyboard hook, never reads key state, writes only to its config directory and makes no network requests. The Windows exe embeds version metadata and an `asInvoker` manifest. During development you can exclude `target/`.
+A global hotkey, simulated paste (`SendInput` / `CGEvent`) and optional autostart in an unsigned binary can trigger heuristic false positives. The app registers one hotkey with `RegisterHotKey`, uses no keyboard hook, never reads key state, writes only to its config and log directories and makes no network requests. The Windows exe embeds version metadata and an `asInvoker` manifest. During development you can exclude `target/`.
 
 ## Code signing
 

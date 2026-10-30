@@ -9,6 +9,7 @@ mod convert;
 mod icon;
 #[cfg(any(windows, target_os = "macos"))]
 mod icon_pixels;
+mod paths;
 mod platform;
 
 #[cfg(any(windows, target_os = "macos"))]

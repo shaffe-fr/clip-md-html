@@ -6,7 +6,6 @@ pub use notify::Notifier;
 pub use paste::paste;
 
 use crate::app::App;
-use std::path::PathBuf;
 use std::ptr::null;
 use std::sync::{mpsc, Arc};
 use windows_sys::Win32::Foundation::{GetLastError, ERROR_ALREADY_EXISTS};
@@ -15,10 +14,6 @@ use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 pub const DEFAULT_HOTKEY: &str = "Win+Alt+V";
 
-pub fn config_dir() -> PathBuf {
-    let base = std::env::var_os("APPDATA").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
-    base.join("clip-md-html")
-}
 
 /// Named mutex: `None` if another instance is already running.
 pub fn single_instance() -> Option<()> {

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 pub use crate::platform::DEFAULT_HOTKEY;
-use crate::platform::config_dir;
+use crate::paths::{self, Migration};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
@@ -18,12 +18,13 @@ impl Default for Config {
 
 
 pub fn config_path() -> PathBuf {
-    config_dir().join("config.toml")
+    paths::config_path()
 }
 
 fn template() -> String {
     format!(
-        "# Global hotkey that converts the clipboard Markdown and pastes it.\n\
+        "# clip-md-html config: ~/.config/clip-md-html/config.toml (or $XDG_CONFIG_HOME/clip-md-html/config.toml).\n\
+# Global hotkey that converts the clipboard Markdown and pastes it.\n\
 # Modifiers: Win (Cmd on macOS), Alt (Option on macOS), Ctrl, Shift.\n\
 # Examples: \"Win+Alt+V\", \"Cmd+Alt+V\", \"Win+Shift+M\".\n\
 # Avoid Ctrl+Alt (AltGr on AZERTY layouts) and Ctrl+Shift+V (Thunderbird's paste as plain text).\n\
@@ -33,8 +34,11 @@ hotkey = \"{DEFAULT_HOTKEY}\"\n"
 
 pub fn log(msg: &str) {
     use std::io::Write;
-    let _ = std::fs::create_dir_all(config_dir());
-    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(config_dir().join("clip-md-html.log")) {
+    let path = paths::log_path();
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
         let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
         let _ = writeln!(f, "[{secs}] {msg}");
     }
@@ -43,13 +47,23 @@ pub fn log(msg: &str) {
 /// Writes the default template on first run. The error is set only when the file exists but cannot be parsed.
 pub fn load() -> (Config, Option<String>) {
     let path = config_path();
+    if let Some(legacy) = paths::legacy_config_path() {
+        match paths::migrate(&path, &legacy) {
+            Migration::Copied => log(&format!("config migrated from {} to {}", legacy.display(), path.display())),
+            Migration::LegacyIgnored => log(&format!("legacy config {} is ignored; using {}", legacy.display(), path.display())),
+            Migration::Failed(e) => log(&format!("could not migrate config from {}: {e}", legacy.display())),
+            Migration::None => {}
+        }
+    }
     match std::fs::read_to_string(&path) {
         Ok(text) => match toml::from_str(&text) {
             Ok(c) => (c, None),
             Err(e) => (Config::default(), Some(format!("invalid config.toml ({})", e.message()))),
         },
         Err(_) => {
-            let _ = std::fs::create_dir_all(config_dir());
+            if let Some(dir) = path.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
             let _ = std::fs::write(&path, template());
             (Config::default(), None)
         }

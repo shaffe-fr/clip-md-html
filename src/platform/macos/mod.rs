@@ -6,7 +6,6 @@ pub use notify::Notifier;
 pub use paste::{paste, paste_permission_problem};
 
 use crate::app::{App, Msg, Wake};
-use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
 use winit::application::ApplicationHandler;
@@ -17,15 +16,12 @@ use winit::window::WindowId;
 
 pub const DEFAULT_HOTKEY: &str = "Cmd+Alt+V";
 
-pub fn config_dir() -> PathBuf {
-    let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
-    home.join("Library/Application Support/clip-md-html")
-}
 
 /// Exclusive file lock: `None` if another instance is already running.
 pub fn single_instance() -> Option<()> {
-    let _ = std::fs::create_dir_all(config_dir());
-    let file = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(config_dir().join("instance.lock")).ok()?;
+    let dir = crate::paths::log_dir(&crate::paths::process_env);
+    let _ = std::fs::create_dir_all(&dir);
+    let file = std::fs::OpenOptions::new().create(true).truncate(false).write(true).open(dir.join("instance.lock")).ok()?;
     file.try_lock().ok()?;
     // Leaked on purpose: closing the file would release the lock.
     std::mem::forget(file);
