@@ -18,7 +18,7 @@ arboard = { version = "=3.7.0", default-features = false }
 global-hotkey = "=0.9.0"
 tray-icon = { version = "=0.26.1", default-features = false }
 serde = { version = "=1.0.229", features = ["derive"] }
-toml = "=1.1.8"
+toml = "=1.2.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 arboard = { version = "=3.7.0", default-features = false, features = ["wayland-data-control"] }
