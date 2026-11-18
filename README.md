@@ -5,7 +5,7 @@
 
 Tray app for Windows and macOS (CLI on Linux): press a global hotkey and the Markdown in the clipboard is converted to HTML and pasted as rich text. Built for copying raw Markdown from an AI assistant or editor into Thunderbird or any rich-text editor.
 
-The HTML is semantic and unstyled, so the target applies its own defaults. Tables, strikethrough and task lists are supported. The original Markdown stays on the clipboard as the plain-text flavor.
+The HTML is semantic and unstyled, so the target applies its own defaults. Tables, strikethrough and task lists are supported. A single newline is kept as a line break, as in GitHub comments, so one sentence per line stays one sentence per line. The original Markdown stays on the clipboard as the plain-text flavor.
 
 It also works the other way: select text in a mail or a web page, press a second hotkey, and the clipboard holds the selection as Markdown. See [HTML to Markdown](#html-to-markdown).
 

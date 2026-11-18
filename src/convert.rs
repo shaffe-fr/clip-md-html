@@ -2,7 +2,7 @@ use htmd::element_handler::{Context, HandlerResult, Handlers};
 use htmd::node::Node;
 use htmd::options::{BulletListMarker, LinkStyle, Options};
 use htmd::{Element, HtmlToMarkdown};
-use pulldown_cmark::{html, Options as MdOptions, Parser};
+use pulldown_cmark::{html, Event, Options as MdOptions, Parser};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -10,11 +10,55 @@ use std::sync::Arc;
 pub type SaveImage = Arc<dyn Fn(&str) -> Option<PathBuf> + Send + Sync>;
 
 /// Semantic HTML with no styling, so the target editor applies its own defaults.
+///
+/// A single newline is a line break, as in GitHub comments: Markdown written for a mail keeps
+/// one sentence per line, which CommonMark would otherwise join into one line.
 pub fn markdown_to_html(markdown: &str) -> String {
     let options = MdOptions::ENABLE_TABLES | MdOptions::ENABLE_STRIKETHROUGH | MdOptions::ENABLE_TASKLISTS;
-    let parser = Parser::new_ext(markdown, options);
+    let markdown = end_lists_at_unindented_lines(markdown);
+    let parser = Parser::new_ext(&markdown, options).map(|event| match event {
+        Event::SoftBreak => Event::HardBreak,
+        other => other,
+    });
     let mut out = String::with_capacity(markdown.len() * 2);
     html::push_html(&mut out, parser);
+    out
+}
+
+fn is_list_item(line: &str) -> bool {
+    let line = line.trim_start();
+    if let Some(rest) = line.strip_prefix(['-', '*', '+']) {
+        return rest.is_empty() || rest.starts_with([' ', '\t']);
+    }
+    let digits = line.bytes().take_while(u8::is_ascii_digit).count();
+    (1..=9).contains(&digits) && line[digits..].strip_prefix(['.', ')']).is_some_and(|r| r.is_empty() || r.starts_with([' ', '\t']))
+}
+
+/// An unindented line right after a list item would be a lazy continuation of that item; with
+/// line breaks kept it reads as the next paragraph, so a blank line ends the list there.
+fn end_lists_at_unindented_lines(markdown: &str) -> String {
+    let mut out = String::with_capacity(markdown.len() + 16);
+    let mut fence: Option<&str> = None;
+    let mut after_item = false;
+    for line in markdown.split_inclusive('\n') {
+        let text = line.trim_end_matches(['\r', '\n']);
+        let trimmed = text.trim_start();
+        if let Some(f) = fence {
+            if trimmed.starts_with(f) {
+                fence = None;
+            }
+            out.push_str(line);
+            continue;
+        }
+        let starts_fence = ["```", "~~~"].into_iter().find(|f| trimmed.starts_with(f));
+        let unindented = !text.is_empty() && !text.starts_with([' ', '\t']);
+        if after_item && unindented && !is_list_item(text) {
+            out.push('\n');
+        }
+        out.push_str(line);
+        fence = starts_fence;
+        after_item = fence.is_none() && (is_list_item(text) || after_item && !text.trim().is_empty() && !unindented);
+    }
     out
 }
 
@@ -226,6 +270,15 @@ mod tests {
         assert!(html.contains("<table>"));
         assert!(html.contains("checkbox"));
         assert!(!html.contains("style="));
+    }
+
+    #[test]
+    fn single_newlines_are_line_breaks() {
+        let html = markdown_to_html("Objet : Re: Mise\n\nUn.\nDeux ?\n- a ;\n  suite\n- b.\nFin\n\n```\n- x\ny\n```\n");
+        assert_eq!(
+            html,
+            "<p>Objet : Re: Mise</p>\n<p>Un.<br />\nDeux ?</p>\n<ul>\n<li>a ;<br />\nsuite</li>\n<li>b.</li>\n</ul>\n<p>Fin</p>\n<pre><code>- x\ny\n</code></pre>\n"
+        );
     }
 
     fn md(html: &str) -> String {
