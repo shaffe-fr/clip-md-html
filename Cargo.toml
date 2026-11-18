@@ -1,6 +1,6 @@
 [package]
 name = "clip-md-html"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "Converts clipboard Markdown to rich HTML and selected HTML (mail, web page) back to Markdown: tray app with global hotkeys on Windows and macOS, CLI on Linux"
 license = "MIT"
