@@ -2,17 +2,24 @@ use global_hotkey::hotkey::{Code, HotKey, Modifiers};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub use crate::platform::DEFAULT_HOTKEY;
+pub use crate::platform::{DEFAULT_HOTKEY, DEFAULT_MARKDOWN_HOTKEY};
 use crate::paths::{self, Migration};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
     pub hotkey: String,
+    /// Missing from configs written before this hotkey existed.
+    #[serde(default = "default_markdown_hotkey")]
+    pub markdown_hotkey: String,
+}
+
+fn default_markdown_hotkey() -> String {
+    DEFAULT_MARKDOWN_HOTKEY.to_string()
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { hotkey: DEFAULT_HOTKEY.to_string() }
+        Self { hotkey: DEFAULT_HOTKEY.to_string(), markdown_hotkey: default_markdown_hotkey() }
     }
 }
 
@@ -28,7 +35,10 @@ fn template() -> String {
 # Modifiers: Win (Cmd on macOS), Alt (Option on macOS), Ctrl, Shift.\n\
 # Examples: \"Win+Alt+V\", \"Cmd+Alt+V\", \"Win+Shift+M\".\n\
 # Avoid Ctrl+Alt (AltGr on AZERTY layouts) and Ctrl+Shift+V (Thunderbird's paste as plain text).\n\
-hotkey = \"{DEFAULT_HOTKEY}\"\n"
+hotkey = \"{DEFAULT_HOTKEY}\"\n\
+\n\
+# Global hotkey that copies the selection (a mail, a web page) and turns it into Markdown on the clipboard.\n\
+markdown_hotkey = \"{DEFAULT_MARKDOWN_HOTKEY}\"\n"
     )
 }
 
@@ -113,6 +123,21 @@ mod tests {
         let hk = parse_hotkey(DEFAULT_HOTKEY).unwrap();
         assert_eq!(hk.key, Code::KeyV);
         assert!(hk.mods.contains(Modifiers::META | Modifiers::ALT));
+    }
+
+    #[test]
+    fn markdown_default_is_valid_and_distinct() {
+        let md = parse_hotkey(DEFAULT_MARKDOWN_HOTKEY).unwrap();
+        assert_ne!(md.id(), parse_hotkey(DEFAULT_HOTKEY).unwrap().id());
+    }
+
+    #[test]
+    fn config_without_markdown_hotkey_still_loads() {
+        let c: Config = toml::from_str("hotkey = \"Win+Alt+X\"").unwrap();
+        assert_eq!(c.hotkey, "Win+Alt+X");
+        assert_eq!(c.markdown_hotkey, DEFAULT_MARKDOWN_HOTKEY);
+        let template: Config = toml::from_str(&template()).unwrap();
+        assert_eq!(template.markdown_hotkey, DEFAULT_MARKDOWN_HOTKEY);
     }
 
     #[test]

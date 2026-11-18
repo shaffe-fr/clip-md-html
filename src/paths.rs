@@ -51,6 +51,11 @@ pub fn log_dir(get: Get) -> PathBuf {
     }
 }
 
+/// Images extracted by the HTML to Markdown conversion: `~/Pictures/clip-md-html`.
+pub fn images_dir(get: Get) -> PathBuf {
+    home(get).join("Pictures").join(APP)
+}
+
 pub fn config_path() -> PathBuf {
     config_dir(&process_env).join("config.toml")
 }

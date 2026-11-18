@@ -11,20 +11,28 @@ fn key(vk: u16, up: bool) -> INPUT {
     }
 }
 
-/// Sends Ctrl+V to the foreground window in a single `SendInput` batch.
+/// Sends Ctrl+`letter` to the foreground window in a single `SendInput` batch.
 ///
 /// The hotkey modifiers are still physically held when it fires, so the batch releases them
-/// explicitly (after a dummy key) before Ctrl+V. No keyboard state reads and no hooks, which
-/// keeps antivirus heuristics quiet.
-pub fn paste() -> Result<(), String> {
+/// explicitly (after a dummy key) before the shortcut. No keyboard state reads and no hooks,
+/// which keeps antivirus heuristics quiet.
+fn send_ctrl(letter: u8, action: &str) -> Result<(), String> {
     let releases = [VK_LWIN, VK_RWIN, VK_LMENU, VK_RMENU, VK_LSHIFT, VK_RSHIFT, VK_LCONTROL, VK_RCONTROL];
     let mut inputs = vec![key(DUMMY_VK, false), key(DUMMY_VK, true)];
     inputs.extend(releases.iter().map(|&vk| key(vk, true)));
-    inputs.extend([key(VK_CONTROL, false), key(b'V' as u16, false), key(b'V' as u16, true), key(VK_CONTROL, true)]);
+    inputs.extend([key(VK_CONTROL, false), key(letter as u16, false), key(letter as u16, true), key(VK_CONTROL, true)]);
     let sent = unsafe { SendInput(inputs.len() as u32, inputs.as_ptr(), std::mem::size_of::<INPUT>() as i32) };
     if sent as usize == inputs.len() {
         Ok(())
     } else {
-        Err("automatic paste blocked by Windows (elevated target window?)".into())
+        Err(format!("automatic {action} blocked by Windows (elevated target window?)"))
     }
+}
+
+pub fn paste() -> Result<(), String> {
+    send_ctrl(b'V', "paste")
+}
+
+pub fn copy() -> Result<(), String> {
+    send_ctrl(b'C', "copy")
 }

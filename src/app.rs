@@ -1,4 +1,4 @@
-use crate::clipboard::convert_clipboard;
+use crate::clipboard::{convert_clipboard, convert_clipboard_to_markdown, copy_selection_to_markdown};
 use crate::config::{self, log};
 use crate::platform::{self, autostart, Notifier};
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
@@ -7,7 +7,8 @@ use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuId, MenuItem, Predefin
 use tray_icon::{TrayIcon, TrayIconBuilder};
 
 pub enum Msg {
-    Hotkey,
+    /// Id of the hotkey that fired.
+    Hotkey(u32),
     Menu(MenuId),
 }
 
@@ -17,7 +18,10 @@ pub struct App {
     pub notifier: Notifier,
     _tray: TrayIcon,
     _manager: Option<GlobalHotKeyManager>,
+    html_hotkey: Option<u32>,
+    markdown_hotkey: Option<u32>,
     convert_id: MenuId,
+    to_markdown_id: MenuId,
     quit_id: MenuId,
     autostart_item: CheckMenuItem,
 }
@@ -27,11 +31,12 @@ impl App {
     pub fn new(tx: Sender<Msg>, wake: Wake) -> Self {
         let mut notifier = Notifier::new();
 
-        let convert = MenuItem::new("Convert now", true, None);
+        let convert = MenuItem::new("Convert Markdown to HTML now", true, None);
+        let to_markdown = MenuItem::new("Convert HTML to Markdown now", true, None);
         let autostart_item = CheckMenuItem::new(autostart_label(), true, autostart::is_enabled(), None);
         let quit = MenuItem::new("Quit", true, None);
         let menu = Menu::new();
-        let _ = menu.append_items(&[&convert, &autostart_item, &PredefinedMenuItem::separator(), &quit]);
+        let _ = menu.append_items(&[&convert, &to_markdown, &autostart_item, &PredefinedMenuItem::separator(), &quit]);
 
         let tray = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
@@ -48,19 +53,22 @@ impl App {
         }));
         GlobalHotKeyEvent::set_event_handler(Some(move |e: GlobalHotKeyEvent| {
             if e.state == HotKeyState::Pressed {
-                let _ = tx.send(Msg::Hotkey);
+                let _ = tx.send(Msg::Hotkey(e.id));
                 wake();
             }
         }));
 
-        let manager = register_hotkey(&mut notifier);
+        let hotkeys = register_hotkeys(&mut notifier);
         check_paste_permission(&mut notifier);
 
         Self {
             notifier,
             _tray: tray,
-            _manager: manager,
+            _manager: hotkeys.manager,
+            html_hotkey: hotkeys.html,
+            markdown_hotkey: hotkeys.markdown,
             convert_id: convert.id().clone(),
+            to_markdown_id: to_markdown.id().clone(),
             quit_id: quit.id().clone(),
             autostart_item,
         }
@@ -69,8 +77,11 @@ impl App {
     /// Returns `true` to quit.
     pub fn handle(&mut self, msg: Msg) -> bool {
         match msg {
-            Msg::Hotkey => self.convert(true),
+            Msg::Hotkey(id) if Some(id) == self.html_hotkey => self.convert(true),
+            Msg::Hotkey(id) if Some(id) == self.markdown_hotkey => self.convert_to_markdown(true),
+            Msg::Hotkey(_) => {}
             Msg::Menu(id) if id == self.convert_id => self.convert(false),
+            Msg::Menu(id) if id == self.to_markdown_id => self.convert_to_markdown(false),
             Msg::Menu(id) if id == self.quit_id => return true,
             Msg::Menu(id) if id == *self.autostart_item.id() => {
                 let want = self.autostart_item.is_checked();
@@ -102,41 +113,79 @@ impl App {
             }
         }
     }
+
+    /// With `copy_selection`, copies what is selected in the focused window first; otherwise
+    /// converts the HTML already on the clipboard. There is nothing to see afterwards, hence the notification.
+    fn convert_to_markdown(&mut self, copy_selection: bool) {
+        let result = if copy_selection { copy_selection_to_markdown() } else { convert_clipboard_to_markdown() };
+        match result {
+            Ok(()) => {
+                log("converted to Markdown");
+                self.notifier.show("clip-md-html", "Copied as Markdown.");
+            }
+            Err(e) => {
+                log(&format!("could not convert to Markdown: {e}"));
+                self.notifier.show("clip-md-html", &format!("Could not convert to Markdown: {e}."));
+            }
+        }
+    }
 }
 
 fn autostart_label() -> &'static str {
     if cfg!(windows) { "Start with Windows" } else { "Start at login" }
 }
 
-fn register_hotkey(notifier: &mut Notifier) -> Option<GlobalHotKeyManager> {
+struct Hotkeys {
+    manager: Option<GlobalHotKeyManager>,
+    html: Option<u32>,
+    markdown: Option<u32>,
+}
+
+fn register_hotkeys(notifier: &mut Notifier) -> Hotkeys {
     let (cfg, cfg_err) = config::load();
     if let Some(e) = cfg_err {
-        let msg = format!("{e}. Using default hotkey ({}). Config: {}", config::DEFAULT_HOTKEY, config::config_path().display());
+        let msg = format!(
+            "{e}. Using default hotkeys ({}, {}). Config: {}",
+            config::DEFAULT_HOTKEY,
+            config::DEFAULT_MARKDOWN_HOTKEY,
+            config::config_path().display()
+        );
         log(&msg);
         notifier.show("clip-md-html: configuration", &msg);
     }
-    let hotkey = match config::parse_hotkey(&cfg.hotkey) {
-        Ok(h) => h,
+    let manager = match GlobalHotKeyManager::new() {
+        Ok(m) => m,
         Err(e) => {
-            let msg = format!("{e}. Using default hotkey ({}). Config: {}", config::DEFAULT_HOTKEY, config::config_path().display());
+            let msg = format!("Hotkeys are unavailable ({e}). Change them in {}", config::config_path().display());
             log(&msg);
-            notifier.show("clip-md-html: configuration", &msg);
-            config::parse_hotkey(config::DEFAULT_HOTKEY).expect("default hotkey is valid")
+            notifier.show("clip-md-html: hotkey unavailable", &msg);
+            return Hotkeys { manager: None, html: None, markdown: None };
         }
     };
-    let result = GlobalHotKeyManager::new().map_err(|e| e.to_string()).and_then(|m| {
-        m.register(hotkey).map_err(|e| e.to_string())?;
-        Ok(m)
-    });
-    match result {
-        Ok(m) => {
-            log(&format!("hotkey registered: {hotkey} (config: {})", cfg.hotkey));
-            Some(m)
+    let html = register_hotkey(&manager, notifier, &cfg.hotkey, config::DEFAULT_HOTKEY);
+    let markdown = register_hotkey(&manager, notifier, &cfg.markdown_hotkey, config::DEFAULT_MARKDOWN_HOTKEY);
+    Hotkeys { manager: Some(manager), html, markdown }
+}
+
+/// Registers `spec`, or `default` when `spec` is invalid. Returns the id of the registered hotkey.
+fn register_hotkey(manager: &GlobalHotKeyManager, notifier: &mut Notifier, spec: &str, default: &str) -> Option<u32> {
+    let hotkey = match config::parse_hotkey(spec) {
+        Ok(h) => h,
+        Err(e) => {
+            let msg = format!("{e}. Using default hotkey ({default}). Config: {}", config::config_path().display());
+            log(&msg);
+            notifier.show("clip-md-html: configuration", &msg);
+            config::parse_hotkey(default).expect("default hotkey is valid")
+        }
+    };
+    match manager.register(hotkey) {
+        Ok(()) => {
+            log(&format!("hotkey registered: {hotkey} (config: {spec})"));
+            Some(hotkey.id())
         }
         Err(e) => {
             let msg = format!(
-                "Hotkey {} is unavailable ({e}). It may already be in use; change it in {}",
-                cfg.hotkey,
+                "Hotkey {spec} is unavailable ({e}). It may already be in use; change it in {}",
                 config::config_path().display()
             );
             log(&msg);

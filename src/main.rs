@@ -9,17 +9,23 @@ mod convert;
 mod icon;
 #[cfg(any(windows, target_os = "macos"))]
 mod icon_pixels;
+mod images;
 mod paths;
 mod platform;
 
 #[cfg(any(windows, target_os = "macos"))]
 fn main() {
-    if std::env::args().any(|a| a == "--once") {
-        if let Err(e) = clipboard::convert_clipboard() {
-            config::log(&format!("--once: {e}"));
-            std::process::exit(1);
+    for (flag, convert) in [
+        ("--once", clipboard::convert_clipboard as fn() -> Result<(), String>),
+        ("--to-markdown", clipboard::convert_clipboard_to_markdown),
+    ] {
+        if std::env::args().any(|a| a == flag) {
+            if let Err(e) = convert() {
+                config::log(&format!("{flag}: {e}"));
+                std::process::exit(1);
+            }
+            return;
         }
-        return;
     }
     if platform::single_instance().is_none() {
         return;
@@ -29,11 +35,13 @@ fn main() {
 
 #[cfg(target_os = "linux")]
 const USAGE: &str = "\
-clip-md-html converts the Markdown in the clipboard to HTML (text/html, plain text kept).
+clip-md-html converts the Markdown in the clipboard to HTML (text/html, plain text kept),
+or the HTML in the clipboard to Markdown.
 
 Usage:
-  clip-md-html --once     convert the clipboard and return; a background process keeps serving it
-  clip-md-html --paste    same, then send Ctrl+V with wtype, ydotool or xdotool
+  clip-md-html --once         convert the clipboard and return; a background process keeps serving it
+  clip-md-html --paste        same, then send Ctrl+V with wtype, ydotool or xdotool
+  clip-md-html --to-markdown  replace the HTML in the clipboard (a mail, a web page) with its Markdown
 
 There is no tray icon or built-in hotkey on Linux: bind one of these commands to a custom
 keyboard shortcut in your desktop environment (see the README).";
@@ -44,6 +52,10 @@ fn main() {
     let has = |flag: &str| args.iter().any(|a| a == flag);
     let result = if has(clipboard::HOLD_ARG) {
         clipboard::hold_clipboard()
+    } else if has(clipboard::HOLD_TEXT_ARG) {
+        clipboard::hold_text()
+    } else if has("--to-markdown") {
+        clipboard::convert_clipboard_to_markdown()
     } else if has("--once") || has("--paste") {
         clipboard::convert_clipboard().and_then(|()| if has("--paste") { paste() } else { Ok(()) })
     } else {

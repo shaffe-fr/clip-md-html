@@ -2,7 +2,7 @@
 name = "clip-md-html"
 version = "0.3.0"
 edition = "2021"
-description = "Converts clipboard Markdown to rich HTML: tray app with a global hotkey on Windows and macOS, CLI on Linux"
+description = "Converts clipboard Markdown to rich HTML and selected HTML (mail, web page) back to Markdown: tray app with global hotkeys on Windows and macOS, CLI on Linux"
 license = "MIT"
 repository = "https://github.com/shaffe-fr/clip-md-html"
 readme = "README.md"
@@ -13,6 +13,8 @@ rust-version = "1.90"
 [dependencies]
 pulldown-cmark = { version = "=0.13.6", default-features = false, features = ["html"] }
 arboard = { version = "=3.7.0", default-features = false }
+htmd = "=0.6.0"
+base64 = "=0.23.1"
 
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]
 global-hotkey = "=0.9.0"

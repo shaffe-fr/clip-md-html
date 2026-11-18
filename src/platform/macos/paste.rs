@@ -16,13 +16,14 @@ extern "C" {
 }
 
 const HID_EVENT_TAP: u32 = 0;
+const KEYCODE_C: u16 = 8;
 const KEYCODE_V: u16 = 9;
 const FLAG_COMMAND: u64 = 0x0010_0000;
 
 const HELP: &str = "Allow clip-md-html in System Settings > Privacy & Security > Accessibility \
-to enable automatic paste, then restart the app.";
+to enable automatic paste and copy, then restart the app.";
 
-/// Posting Cmd+V requires the Accessibility permission.
+/// Posting Cmd+V and Cmd+C requires the Accessibility permission.
 pub fn paste_permission_problem() -> Option<String> {
     if unsafe { AXIsProcessTrusted() } {
         None
@@ -31,9 +32,9 @@ pub fn paste_permission_problem() -> Option<String> {
     }
 }
 
-fn post_v(down: bool) {
+fn post_key(keycode: u16, down: bool) {
     unsafe {
-        let ev = CGEventCreateKeyboardEvent(std::ptr::null(), KEYCODE_V, down);
+        let ev = CGEventCreateKeyboardEvent(std::ptr::null(), keycode, down);
         if ev.is_null() {
             return;
         }
@@ -45,12 +46,20 @@ fn post_v(down: bool) {
 
 /// Flags are set explicitly to Cmd only on each event, so Option/Shift still physically held
 /// from the hotkey do not alter the shortcut. No keyboard state reads.
-pub fn paste() -> Result<(), String> {
+fn send_cmd(keycode: u16, unavailable: &str) -> Result<(), String> {
     if let Some(msg) = paste_permission_problem() {
-        return Err(format!("Text converted, but automatic paste is unavailable. {msg}"));
+        return Err(format!("{unavailable} {msg}"));
     }
     std::thread::sleep(std::time::Duration::from_millis(80));
-    post_v(true);
-    post_v(false);
+    post_key(keycode, true);
+    post_key(keycode, false);
     Ok(())
+}
+
+pub fn paste() -> Result<(), String> {
+    send_cmd(KEYCODE_V, "Text converted, but automatic paste is unavailable.")
+}
+
+pub fn copy() -> Result<(), String> {
+    send_cmd(KEYCODE_C, "Automatic copy is unavailable.")
 }

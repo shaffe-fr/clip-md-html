@@ -3,7 +3,7 @@ mod notify;
 mod paste;
 
 pub use notify::Notifier;
-pub use paste::paste;
+pub use paste::{copy, paste};
 
 use crate::app::App;
 use std::ptr::null;
@@ -13,6 +13,7 @@ use windows_sys::Win32::System::Threading::{CreateMutexW, GetCurrentThreadId};
 use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
 pub const DEFAULT_HOTKEY: &str = "Win+Alt+V";
+pub const DEFAULT_MARKDOWN_HOTKEY: &str = "Win+Alt+C";
 
 
 /// Named mutex: `None` if another instance is already running.

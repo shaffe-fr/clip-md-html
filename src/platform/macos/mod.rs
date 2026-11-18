@@ -3,7 +3,7 @@ mod notify;
 mod paste;
 
 pub use notify::Notifier;
-pub use paste::{paste, paste_permission_problem};
+pub use paste::{copy, paste, paste_permission_problem};
 
 use crate::app::{App, Msg, Wake};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -15,6 +15,8 @@ use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 use winit::window::WindowId;
 
 pub const DEFAULT_HOTKEY: &str = "Cmd+Alt+V";
+// Cmd+Option+C is taken by browser dev tools and Finder's "Copy as Pathname".
+pub const DEFAULT_MARKDOWN_HOTKEY: &str = "Cmd+Alt+M";
 
 
 /// Exclusive file lock: `None` if another instance is already running.
