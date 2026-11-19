@@ -48,6 +48,7 @@ Only text remains on the clipboard afterwards (no HTML flavor). Besides the usua
 - Monospace runs (Courier New, Consolas, ...) become inline code.
 - Word list paragraphs become Markdown list items, nested by level.
 - Empty spacer paragraphs are dropped and non-breaking spaces become plain spaces.
+- A line break (`<br>`) becomes a plain newline, as in GitHub comments, rather than CommonMark's two trailing spaces; inside a table cell it stays `<br>`. The other hotkey reads it back as a line break.
 - Images embedded in the copy are saved to `~/Pictures/clip-md-html` and linked by absolute path, e.g. `![image](C:/Users/you/Pictures/clip-md-html/20261118-161016-1.png)`. That covers Thunderbird and Betterbird (`data:` images) and Outlook/Word (`file:` temp copies, read right after the copy). An agent such as Kiro can open these paths; for a web tool like Jira, drag the file in. Names are the conversion time in UTC plus a number; the same image twice in one copy is saved once. Files named this way are deleted once they are more than 24 hours old, the next time an image is saved; other files in the folder are left alone.
 - Images with a web address are kept as `![alt](url)`. References to mail parts that cannot be read (`cid:`, `imap:`, `mailbox:`, ...) become `[image]`.
 

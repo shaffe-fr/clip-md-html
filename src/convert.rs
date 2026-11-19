@@ -70,6 +70,7 @@ fn end_lists_at_unindented_lines(markdown: &str) -> String {
 pub fn html_to_markdown(html: &str, save_image: SaveImage) -> Result<String, String> {
     // Non-breaking spaces are layout in mail HTML and noise in Markdown.
     let html = html.replace("&nbsp;", " ").replace('\u{a0}', " ");
+    let html = trim_after_line_breaks(&html);
     let converter = HtmlToMarkdown::builder()
         .options(Options {
             bullet_list_marker: BulletListMarker::Dash,
@@ -82,9 +83,52 @@ pub fn html_to_markdown(html: &str, save_image: SaveImage) -> Result<String, Str
         .add_handler(vec!["img"], move |handlers: &dyn Handlers, element: &Element| image(handlers, element, &save_image))
         .add_handler(vec!["span", "font", "mark"], inline_run)
         .add_handler(vec!["p"], word_list_item)
+        .add_handler(vec!["br"], line_break)
         .build();
     let markdown = converter.convert(html.as_str()).map_err(|e| format!("could not convert the HTML: {e}"))?;
     Ok(tidy(&markdown))
+}
+
+/// `<br>` as a bare newline, as in GitHub comments (and as `markdown_to_html` reads it back),
+/// instead of CommonMark's invisible two trailing spaces. A table row must stay on one line, so
+/// in a cell it is kept as `<br>`, which GitHub tables accept.
+fn line_break(_: &dyn Handlers, element: &Element) -> Option<HandlerResult> {
+    let mut parent = element.node.parent();
+    while let Some(node) = parent {
+        if matches!(node.tag_name(), Some("td" | "th")) {
+            return Some("<br>".into());
+        }
+        parent = node.parent();
+    }
+    Some("\n".into())
+}
+
+/// Mail HTML often has a newline or spaces after `<br>`; with a bare newline as the break they
+/// would indent the next line. Skipped when the copy has preformatted text, whose spaces count.
+fn trim_after_line_breaks(html: &str) -> String {
+    let lower = html.to_ascii_lowercase();
+    if lower.contains("<pre") {
+        return html.to_string();
+    }
+    let mut out = String::with_capacity(html.len());
+    let mut rest = 0;
+    let mut search = 0;
+    while let Some(found) = lower[search..].find("<br") {
+        let start = search + found;
+        let after_name = start + 3;
+        search = after_name;
+        if !lower[after_name..].starts_with(['>', '/', ' ', '\t', '\r', '\n']) {
+            continue;
+        }
+        let Some(close) = lower[after_name..].find('>') else { break };
+        let end = after_name + close + 1;
+        let skipped = html[end..].len() - html[end..].trim_start_matches([' ', '\t', '\r', '\n']).len();
+        out.push_str(&html[rest..end]);
+        rest = end + skipped;
+        search = rest;
+    }
+    out.push_str(&html[rest..]);
+    out
 }
 
 fn tidy(markdown: &str) -> String {
@@ -303,7 +347,7 @@ mod tests {
                       <p class=MsoNormal>Cordialement<o:p></o:p></p>\
                       <div style='border:none;border-top:solid #E1E1E1 1.0pt;padding:3.0pt 0cm 0cm 0cm'>\
                       <p class=MsoNormal><b>De&nbsp;:</b> Jean<br><b>Objet&nbsp;:</b> Relance<o:p></o:p></p></div>");
-        assert_eq!(out, "Bonjour\n\nCordialement\n\n**De :** Jean  \n**Objet :** Relance");
+        assert_eq!(out, "Bonjour\n\nCordialement\n\n**De :** Jean\n**Objet :** Relance");
     }
 
     #[test]
@@ -321,6 +365,23 @@ mod tests {
              NEO lit-il `CDE.TXT` en continu (toutes les 15 minutes) ?\n\n<mark>L/V de 08h à 18h</mark>\n\n\
              <mark>C’est faux. La commande a était importé.</mark>\n\n[image]"
         );
+    }
+
+    #[test]
+    fn line_breaks_are_bare_newlines() {
+        assert_eq!(md("<p>Cordialement<br>Karel<br>\n Tel : 01</p>"), "Cordialement\nKarel\nTel : 01");
+        assert_eq!(md("<div>Un<br><BR/>Deux<br></div>"), "Un\n\nDeux");
+        assert_eq!(md("<p>a<br>- b<br>1. c</p>"), "a\n\\- b\n1\\. c");
+        assert_eq!(md("<ul><li>a<br>b</li><li>c</li></ul>"), "- a\n  b\n- c");
+        assert_eq!(md("<blockquote>q1<br>q2</blockquote>"), "> q1\n> q2");
+        assert!(md("<table><tr><th>h</th></tr><tr><td>a<br>b</td></tr></table>").contains("| a<br>b |"));
+        assert_eq!(md("<p>a<bR >b<brx>c</p>"), "a\nbc");
+    }
+
+    #[test]
+    fn line_breaks_round_trip_through_markdown_to_html() {
+        let html = markdown_to_html(&md("<p>Cordialement<br>Karel</p><ul><li>a<br>b</li></ul>"));
+        assert_eq!(html, "<p>Cordialement<br />\nKarel</p>\n<ul>\n<li>a<br />\nb</li>\n</ul>\n");
     }
 
     #[test]
