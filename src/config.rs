@@ -34,7 +34,7 @@ fn template() -> String {
 # Global hotkey that converts the clipboard Markdown and pastes it.\n\
 # Modifiers: Win (Cmd on macOS), Alt (Option on macOS), Ctrl, Shift.\n\
 # Examples: \"Win+Alt+V\", \"Cmd+Alt+V\", \"Win+Shift+M\".\n\
-# Avoid Ctrl+Alt (AltGr on AZERTY layouts) and Ctrl+Shift+V (Thunderbird's paste as plain text).\n\
+# Avoid Ctrl+Alt (AltGr on AZERTY layouts) and Ctrl+Shift+V (paste as plain text in most apps).\n\
 hotkey = \"{DEFAULT_HOTKEY}\"\n\
 \n\
 # Global hotkey that copies the selection (a mail, a web page) and turns it into Markdown on the clipboard.\n\
@@ -88,7 +88,7 @@ pub fn parse_hotkey(spec: &str) -> Result<HotKey, String> {
         return Err("Ctrl+Alt is not allowed (conflicts with AltGr on AZERTY layouts)".into());
     }
     if m == (Modifiers::CONTROL | Modifiers::SHIFT) && hk.key == Code::KeyV {
-        return Err("Ctrl+Shift+V is reserved (Thunderbird's paste as plain text)".into());
+        return Err("Ctrl+Shift+V is reserved (paste as plain text in most apps)".into());
     }
     if m.is_empty() {
         return Err("at least one modifier is required".into());

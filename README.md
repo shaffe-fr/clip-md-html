@@ -10,7 +10,7 @@ Markdown to rich text and back, from a hotkey.
 | `Win+Alt+V` / `Cmd+Option+V` | Markdown on the clipboard, e.g. from an AI | It is pasted as rich text into your mail or editor        |
 | `Win+Alt+C` / `Cmd+Option+M` | A mail or web page selected                | Its Markdown on the clipboard, images included            |
 
-Ask an AI to draft a reply, copy its Markdown, press `Win+Alt+V` in Thunderbird: headings, lists, tables and bold arrive as formatting, not as `**stars**`. The other way round, select a mail thread, press `Win+Alt+C`, paste into Kiro or Jira: highlights, code and screenshots come along.
+Ask an AI to draft a reply, copy its Markdown, press `Win+Alt+V` in your mail: headings, lists, tables and bold arrive as formatting, not as `**stars**`. The other way round, select a mail thread, press `Win+Alt+C`, paste into Kiro or Jira: highlights, code and screenshots come along.
 
 A small tray app for Windows and macOS. On Linux it is a CLI you bind to a shortcut.
 
@@ -49,7 +49,7 @@ Empty spacer paragraphs and non-breaking spaces are cleaned up. Only text is lef
 
 ### Images
 
-Screenshots embedded in the selection are saved to `~/Pictures/clip-md-html` and linked by absolute path. This works with Thunderbird and Betterbird, which embed images in the copy, and with Outlook and Word, whose temporary copies are read right away.
+Screenshots embedded in the selection are saved to `~/Pictures/clip-md-html` and linked by absolute path. Both ways mail clients copy images are handled: embedded in the copy itself, or as temporary files (Outlook, Word) that are read right away.
 
 - Kiro and other local agents open these paths directly. For a web tool such as Jira, drag the file in.
 - Files are named after the conversion time (UTC). The same image twice in one selection is saved once.
@@ -78,7 +78,7 @@ Modifiers: `Win`/`Cmd`, `Alt`/`Option`, `Ctrl`, `Shift`. Restart the app after e
 <details>
 <summary>Rejected hotkeys, upgrades, log location</summary>
 
-- `Ctrl+Alt` is rejected on Windows (it is AltGr on AZERTY), and `Ctrl+Shift+V` everywhere (Thunderbird's paste as plain text).
+- `Ctrl+Alt` is rejected on Windows (it is AltGr on AZERTY), and `Ctrl+Shift+V` everywhere (paste as plain text in most apps).
 - On Windows the file is `%USERPROFILE%\.config\clip-md-html\config.toml`. The Linux CLI reads nothing from it.
 - Configs from earlier versions without `markdown_hotkey` use its default.
 - Upgrading from before 0.3: if the new file does not exist, the old one (`%APPDATA%\clip-md-html\config.toml` on Windows, `~/Library/Application Support/clip-md-html/config.toml` on macOS) is copied over at startup and left in place. If both exist, the new one wins and the log says so.
