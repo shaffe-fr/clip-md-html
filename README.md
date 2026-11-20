@@ -3,11 +3,14 @@
 [![CI](https://github.com/shaffe-fr/clip-md-html/actions/workflows/ci.yml/badge.svg)](https://github.com/shaffe-fr/clip-md-html/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/shaffe-fr/clip-md-html)](https://github.com/shaffe-fr/clip-md-html/releases/latest)
 
-Tray app for Windows and macOS (CLI on Linux): press a global hotkey and the Markdown in the clipboard is converted to HTML and pasted as rich text. Built for copying raw Markdown from an AI assistant or editor into Thunderbird or any rich-text editor.
+Markdown to rich text and back, from a hotkey.
 
-The HTML is semantic and unstyled, so the target applies its own defaults. Tables, strikethrough and task lists are supported. A single newline is kept as a line break, as in GitHub comments, so one sentence per line stays one sentence per line. The original Markdown stays on the clipboard as the plain-text flavor.
+- `Win+Alt+V`: the Markdown on the clipboard (from an AI assistant, an editor) is pasted as rich text into Thunderbird, Outlook or any rich-text editor.
+- `Win+Alt+C`: the selection in a mail or a web page is copied as Markdown, images included, ready to paste into Kiro or another AI assistant.
 
-It also works the other way: select text in a mail or a web page, press a second hotkey, and the clipboard holds the selection as Markdown. See [HTML to Markdown](#html-to-markdown).
+Tray app for Windows and macOS (`Cmd+Option+V` / `Cmd+Option+M`), CLI on Linux.
+
+The HTML is semantic and unstyled, so the target applies its own defaults. Tables, strikethrough and task lists are supported. A single newline is a line break, as in GitHub comments, in both directions. The original Markdown stays on the clipboard as the plain-text flavor. Details of the reverse direction: [HTML to Markdown](#html-to-markdown).
 
 ## Install
 

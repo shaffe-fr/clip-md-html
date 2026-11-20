@@ -2,7 +2,7 @@
 name = "clip-md-html"
 version = "0.4.0"
 edition = "2021"
-description = "Converts clipboard Markdown to rich HTML and selected HTML (mail, web page) back to Markdown: tray app with global hotkeys on Windows and macOS, CLI on Linux"
+description = "Markdown to rich text and back, from a hotkey: paste Markdown into a mail, copy a mail as Markdown"
 license = "MIT"
 repository = "https://github.com/shaffe-fr/clip-md-html"
 readme = "README.md"
