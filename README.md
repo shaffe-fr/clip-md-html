@@ -57,12 +57,12 @@ Screenshots embedded in the selection are saved to `~/Pictures/clip-md-html` and
 
 ## Tray menu
 
-- **Copied Markdown → rich text (then Ctrl+V)**: copy Markdown, click this entry, then paste with Ctrl+V wherever you want.
-- **Copied mail/web → Markdown (then Ctrl+V)**: copy part of a mail or web page, click this entry, then paste the Markdown with Ctrl+V.
-
-On macOS the entries say Cmd+V. These two do the same conversions as the hotkeys but press no key for you. Use them when the hotkey cannot copy or paste on its own: an app running as administrator, macOS without the Accessibility permission, a hotkey taken by another app, a terminal where Ctrl+C or Ctrl+V means something else, or to paste the result in several places.
+- **Replace copied Markdown with rich text**: copy Markdown, click this entry, then paste with Ctrl+V (Cmd+V on macOS) wherever you want.
+- **Replace copied rich text with Markdown**: copy part of a mail or web page, click this entry, then paste the Markdown.
 - **Start with Windows** / **Start at login**: opt-in autostart.
 - **Quit**.
+
+The first two do the same conversions as the hotkeys but press no key for you. Use them when the hotkey cannot copy or paste on its own: an app running as administrator, macOS without the Accessibility permission, a hotkey taken by another app, a terminal where Ctrl+C or Ctrl+V means something else, or to paste the result in several places.
 
 Only one instance runs at a time.
 
