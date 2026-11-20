@@ -10,7 +10,7 @@ Markdown to rich text and back, from a hotkey.
 | `Win+Alt+V` / `Cmd+Option+V` | Markdown on the clipboard, e.g. from an AI | It is pasted as rich text into your mail or editor        |
 | `Win+Alt+C` / `Cmd+Option+M` | A mail or web page selected                | Its Markdown on the clipboard, images included            |
 
-Ask an AI to draft a reply, copy its Markdown, press `Win+Alt+V` in your mail: headings, lists, tables and bold arrive as formatting, not as `**stars**`. The other way round, select a mail thread, press `Win+Alt+C`, paste into Kiro or Jira: highlights, code and screenshots come along.
+Ask an AI to draft a reply, copy its Markdown, press `Win+Alt+V` in your mail: headings, lists, tables and bold arrive as formatting, not as `**stars**`. The other way round, select a mail thread, press `Win+Alt+C`, paste it into an AI assistant, a ticket or your notes: highlights, code and screenshots come along.
 
 A small tray app for Windows and macOS. On Linux it is a CLI you bind to a shortcut.
 
@@ -51,7 +51,7 @@ Empty spacer paragraphs and non-breaking spaces are cleaned up. Only text is lef
 
 Screenshots embedded in the selection are saved to `~/Pictures/clip-md-html` and linked by absolute path. Both ways mail clients copy images are handled: embedded in the copy itself, or as temporary files (Outlook, Word) that are read right away.
 
-- Kiro and other local agents open these paths directly. For a web tool such as Jira, drag the file in.
+- Local tools (a coding agent, a Markdown editor) open these paths directly. In a web app, drag the file in.
 - Files are named after the conversion time (UTC). The same image twice in one selection is saved once.
 - Files the app created are deleted after 24 hours, the next time an image is saved. Anything else in the folder is left alone.
 
