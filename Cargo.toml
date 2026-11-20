@@ -17,7 +17,7 @@ htmd = "=0.6.0"
 base64 = "=0.23.1"
 
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]
-global-hotkey = "=0.9.0"
+global-hotkey = "=0.10.0"
 tray-icon = { version = "=0.26.1", default-features = false }
 serde = { version = "=1.0.229", features = ["derive"] }
 toml = "=1.1.8"
