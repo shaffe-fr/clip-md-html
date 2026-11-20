@@ -31,8 +31,8 @@ impl App {
     pub fn new(tx: Sender<Msg>, wake: Wake) -> Self {
         let mut notifier = Notifier::new();
 
-        let convert = MenuItem::new("Convert Markdown to HTML now", true, None);
-        let to_markdown = MenuItem::new("Convert HTML to Markdown now", true, None);
+        let convert = MenuItem::new(format!("Copied Markdown → rich text (then {PASTE_KEY})"), true, None);
+        let to_markdown = MenuItem::new(format!("Copied mail/web → Markdown (then {PASTE_KEY})"), true, None);
         let autostart_item = CheckMenuItem::new(autostart_label(), true, autostart::is_enabled(), None);
         let quit = MenuItem::new("Quit", true, None);
         let menu = Menu::new();
@@ -130,6 +130,9 @@ impl App {
         }
     }
 }
+
+/// Shown in the tray entries that convert without pressing a key.
+const PASTE_KEY: &str = if cfg!(target_os = "macos") { "Cmd+V" } else { "Ctrl+V" };
 
 fn autostart_label() -> &'static str {
     if cfg!(windows) { "Start with Windows" } else { "Start at login" }
