@@ -43,17 +43,22 @@ Besides the usual headings, emphasis, links, lists, tables, quotes and code, it 
 | Line break                                   | A plain newline (`<br>` inside table cells)      |
 | Pasted screenshot                            | `![image](C:/Users/you/Pictures/clip-md-html/20261118-161016-1.png)` |
 | Image from the web                           | `![alt](https://…)`                              |
+| Image file on your disk (Markdown preview, Obsidian) | `![alt](C:/path/to/the/file.png)`, the file itself |
 | Image the app cannot read (`cid:`, `imap:`)  | `[image]`                                        |
 
 Empty spacer paragraphs and non-breaking spaces are cleaned up. Only text is left on the clipboard.
 
 ### Images
 
-Screenshots embedded in the selection are saved to `~/Pictures/clip-md-html` and linked by absolute path. Both ways mail clients copy images are handled: embedded in the copy itself, or as temporary files (Outlook, Word) that are read right away.
+Every image is linked by an absolute path when it can be read from this machine:
 
-- Local tools (a coding agent, a Markdown editor) open these paths directly. In a web app, drag the file in.
-- Files are named after the conversion time (UTC). The same image twice in one selection is saved once.
-- Files the app created are deleted after 24 hours, the next time an image is saved. Anything else in the folder is left alone.
+- **Embedded in the copy** (`data:` images, as most mail clients copy pasted screenshots): saved to `~/Pictures/clip-md-html`.
+- **A file on your disk**, whatever the address looks like: `file:///C:/…`, VS Code's Markdown preview (`https://file+.vscode-resource.vscode-cdn.net/c%3A/…`), Obsidian (`app://…/C:/…`). The image is linked where it is, nothing is copied. Temporary files, such as the ones Outlook and Word create while copying, are copied to `~/Pictures/clip-md-html` instead, because they disappear.
+- The path is only used if the file exists and has an image extension (png, jpg, gif, webp, bmp). A page you copy from therefore cannot slip the path of another file, such as a credentials file, into the Markdown for an agent to open. Network paths are never tried, and one conversion handles at most 200 images and saves at most 100 MB.
+
+Local tools (a coding agent, a Markdown editor) open these paths directly. In a web app, drag the file in.
+
+Files in `~/Pictures/clip-md-html` are named after the conversion time (UTC); the same image twice in one selection is saved once. Files the app created are deleted after 24 hours, the next time an image is saved. Anything else in the folder is left alone.
 
 ## Tray menu
 

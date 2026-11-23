@@ -1,5 +1,11 @@
-//! Images embedded in copied HTML (`data:` in Thunderbird/Betterbird, `file:` temp files in
-//! Outlook and Word), saved to a folder so the Markdown can point at them.
+//! Where the Markdown should point for an image of copied HTML: images embedded in the copy
+//! (`data:`) are saved to a folder, and image files of this machine named in the address
+//! (`file:`, an editor's Markdown preview, Obsidian) are linked where they are.
+//!
+//! The HTML may come from any web page or mail, so it is untrusted: only files with an image
+//! extension are ever linked or read (a page could otherwise name `~/.aws/credentials` and have
+//! an agent open it from the pasted Markdown), no network path is probed, and the work and the
+//! disk space one conversion can use are capped.
 use base64::Engine;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -10,6 +16,12 @@ use std::time::{Duration, SystemTime};
 const RETENTION: Duration = Duration::from_secs(24 * 3600);
 /// Larger payloads are not images worth keeping from a mail selection.
 const MAX_BYTES: usize = 25 * 1024 * 1024;
+/// Saved by one conversion, all images together.
+const MAX_TOTAL_BYTES: usize = 100 * 1024 * 1024;
+/// Images looked at by one conversion; the rest stay `[image]` or web links.
+const MAX_IMAGES: usize = 200;
+/// Longer non-`data:` addresses are not real image addresses.
+const MAX_ADDRESS: usize = 4096;
 
 pub struct ImageSaver {
     dir: PathBuf,
@@ -20,6 +32,8 @@ pub struct ImageSaver {
 #[derive(Default)]
 struct State {
     count: usize,
+    attempts: usize,
+    stored_bytes: usize,
     /// Same image twice in one selection (a repeated logo): one file.
     by_hash: HashMap<u64, PathBuf>,
     cleaned: bool,
@@ -31,10 +45,38 @@ impl ImageSaver {
         Self { dir, stamp: timestamp(SystemTime::now()), state: Mutex::default() }
     }
 
-    /// Writes the image behind `src` and returns its path, or `None` if `src` is not a
-    /// readable `data:` or `file:` image.
-    pub fn save(&self, src: &str) -> Option<PathBuf> {
-        let (bytes, ext) = read_image(src)?;
+    /// Path to link for the image behind `src`, or `None` when it cannot be read from this machine.
+    ///
+    /// A local file is linked as is, unless it lives in the temp directory (Outlook and Word copy
+    /// images there and delete them later): then it is copied to the folder like a `data:` image.
+    pub fn resolve(&self, src: &str) -> Option<PathBuf> {
+        {
+            let mut state = self.state.lock().ok()?;
+            state.attempts += 1;
+            if state.attempts > MAX_IMAGES {
+                return None;
+            }
+        }
+        let src = src.trim();
+        if src.get(..5).is_some_and(|scheme| scheme.eq_ignore_ascii_case("data:")) {
+            let (bytes, ext) = decode_data_uri(src)?;
+            return self.store(&bytes, ext);
+        }
+        if src.len() > MAX_ADDRESS {
+            return None;
+        }
+        let path = local_file(src)?;
+        if !is_temporary(&path) {
+            return Some(path);
+        }
+        let ext = image_extension(path.extension()?.to_str()?)?;
+        if std::fs::metadata(&path).ok()?.len() as usize > MAX_BYTES {
+            return None;
+        }
+        self.store(&std::fs::read(&path).ok()?, ext)
+    }
+
+    fn store(&self, bytes: &[u8], ext: &str) -> Option<PathBuf> {
         let mut state = self.state.lock().ok()?;
         let hash = {
             use std::hash::{Hash, Hasher};
@@ -45,6 +87,9 @@ impl ImageSaver {
         if let Some(path) = state.by_hash.get(&hash) {
             return Some(path.clone());
         }
+        if state.stored_bytes + bytes.len() > MAX_TOTAL_BYTES {
+            return None;
+        }
         std::fs::create_dir_all(&self.dir).ok()?;
         if !state.cleaned {
             state.cleaned = true;
@@ -52,28 +97,61 @@ impl ImageSaver {
         }
         state.count += 1;
         let path = self.dir.join(format!("{}-{}.{ext}", self.stamp, state.count));
-        std::fs::write(&path, &bytes).ok()?;
+        std::fs::write(&path, bytes).ok()?;
+        state.stored_bytes += bytes.len();
         state.by_hash.insert(hash, path.clone());
         Some(path)
     }
 }
 
-fn read_image(src: &str) -> Option<(Vec<u8>, &'static str)> {
-    let src = src.trim();
-    let scheme = src.split_once(':').map(|(s, _)| s.to_ascii_lowercase())?;
-    match scheme.as_str() {
-        "data" => decode_data_uri(src),
-        "file" => {
-            let path = file_uri_path(src)?;
-            let ext = image_extension(path.extension()?.to_str()?)?;
-            let len = std::fs::metadata(&path).ok()?.len();
-            if len as usize > MAX_BYTES {
-                return None;
+/// The first existing image file among the paths found in the address. Requiring an image
+/// extension and an existing file is what makes the guessing safe: a wrong guess would have to
+/// be a real image on this disk.
+fn local_file(src: &str) -> Option<PathBuf> {
+    candidates(src).into_iter().filter(|p| has_image_extension(p)).find(|p| p.is_file())
+}
+
+fn has_image_extension(path: &Path) -> bool {
+    path.extension().and_then(|e| e.to_str()).and_then(image_extension).is_some()
+}
+
+/// Paths an image address may stand for, most specific first. Query and fragment are dropped
+/// (Obsidian appends `?<timestamp>`), then the address is percent-decoded:
+/// - Windows: a drive (`C:/`) at the start or right after a `/`, whatever the scheme:
+///   `file:///C:/a.png`, `https://file+.vscode-resource.vscode-cdn.net/c%3A/a.png`,
+///   `app://<id>/C:/a.png`. Never a network path (`\\server\share`), which would send the
+///   Windows credentials to whoever the page names.
+/// - Elsewhere: every absolute tail of the address (`/a/b/c.png`, `/b/c.png`, ...).
+fn candidates(src: &str) -> Vec<PathBuf> {
+    let address = src.split(['?', '#']).next().unwrap_or(src);
+    let Some(decoded) = percent_decode(address) else { return Vec::new() };
+    let decoded = decoded.replace('\\', "/");
+    let b = decoded.as_bytes();
+    let mut out = Vec::new();
+    if cfg!(windows) {
+        for i in 0..b.len().saturating_sub(2) {
+            if b[i].is_ascii_alphabetic() && b[i + 1] == b':' && b[i + 2] == b'/' && (i == 0 || b[i - 1] == b'/') {
+                out.push(PathBuf::from(format!("{}{}", decoded[i..=i].to_ascii_uppercase(), &decoded[i + 1..])));
             }
-            Some((std::fs::read(&path).ok()?, ext))
         }
-        _ => None,
+    } else {
+        for i in 0..b.len() {
+            if b[i] == b'/' && b.get(i + 1).is_some_and(|&c| c != b'/') && (i == 0 || b[i - 1] != b'/') {
+                out.push(PathBuf::from(&decoded[i..]));
+            }
+        }
     }
+    out
+}
+
+fn is_temporary(path: &Path) -> bool {
+    let norm = |p: &Path| {
+        let s = p.to_string_lossy().replace('\\', "/");
+        let s = s.trim_end_matches('/').to_string();
+        if cfg!(windows) { s.to_lowercase() } else { s }
+    };
+    let temp = norm(&std::env::temp_dir());
+    !temp.is_empty() && norm(path).starts_with(&format!("{temp}/"))
 }
 
 /// `data:image/png;base64,....` only: other encodings do not occur for mail images.
@@ -106,25 +184,8 @@ fn image_extension(kind: &str) -> Option<&'static str> {
         "gif" => "gif",
         "webp" => "webp",
         "bmp" => "bmp",
-        "svg+xml" | "svg" => "svg",
         _ => return None,
     })
-}
-
-/// `file:///C:/Users/x/a%20b.png` -> `C:/Users/x/a b.png`; `file:///home/x/a.png` -> `/home/x/a.png`.
-fn file_uri_path(src: &str) -> Option<PathBuf> {
-    let rest = src.get(5..)?;
-    let rest = rest.strip_prefix("//").unwrap_or(rest);
-    // Skip an authority such as `localhost`; a Windows drive keeps its colon.
-    let rest = match rest.find('/') {
-        Some(0) => rest,
-        Some(i) if !rest[..i].contains(':') => &rest[i..],
-        _ => rest,
-    };
-    let decoded = percent_decode(rest)?;
-    let b = decoded.as_bytes();
-    let path = if b.len() > 2 && b[0] == b'/' && b[1].is_ascii_alphabetic() && b[2] == b':' { &decoded[1..] } else { &decoded };
-    Some(PathBuf::from(path))
 }
 
 fn percent_decode(s: &str) -> Option<String> {
@@ -207,8 +268,8 @@ mod tests {
         let dir = scratch("data");
         let saver = ImageSaver::new(dir.clone());
         let src = format!("data:image/png;base64,{}\r\n{}", &PNG[..20], &PNG[20..]);
-        let a = saver.save(&src).unwrap();
-        let b = saver.save(&format!("data:image/png;base64,{PNG}")).unwrap();
+        let a = saver.resolve(&src).unwrap();
+        let b = saver.resolve(&format!("data:image/png;base64,{PNG}")).unwrap();
         assert_eq!(a, b);
         assert_eq!(a.extension().unwrap(), "png");
         assert!(is_ours(a.file_name().unwrap().to_str().unwrap()));
@@ -216,35 +277,111 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    fn file_uri(path: &Path) -> String {
+        let p = path.to_str().unwrap().replace('\\', "/").replace(' ', "%20");
+        format!("file:///{}", p.trim_start_matches('/'))
+    }
+
     #[test]
-    fn copies_file_uri_images() {
-        let dir = scratch("file");
+    fn temporary_files_are_copied() {
+        let dir = scratch("temp");
         std::fs::create_dir_all(&dir).unwrap();
         let source = dir.join("clip image001.png");
         std::fs::write(&source, b"\x89PNG fake").unwrap();
-        let uri = format!("file:///{}", source.to_str().unwrap().replace('\\', "/").trim_start_matches('/').replace(' ', "%20"));
-        let saver = ImageSaver::new(dir.join("out"));
-        let saved = saver.save(&uri).unwrap();
+        let out = dir.join("out");
+        let saved = ImageSaver::new(out.clone()).resolve(&file_uri(&source)).unwrap();
+        assert!(saved.starts_with(&out), "{saved:?}");
         assert_eq!(std::fs::read(saved).unwrap(), b"\x89PNG fake");
-        assert!(saver.save("file:///nowhere/missing.png").is_none());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
-    fn rejects_what_is_not_an_image() {
-        let saver = ImageSaver::new(scratch("none"));
-        assert!(saver.save("cid:image001.png@01DC").is_none());
-        assert!(saver.save("data:text/plain;base64,aGVsbG8=").is_none());
-        assert!(saver.save("data:image/png,rawdata").is_none());
-        assert!(saver.save("data:image/png;base64,***").is_none());
-        assert!(saver.save("https://example.com/a.png").is_none());
+    fn other_local_files_are_linked_where_they_are() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("target").join(format!("img-link-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("05 offre.png");
+        std::fs::write(&file, b"x").unwrap();
+        let out = scratch("linked");
+        let saver = ImageSaver::new(out.clone());
+        let path = file.to_str().unwrap().replace('\\', "/");
+        let encoded = path.trim_start_matches('/').replace(':', "%3A").replace(' ', "%20");
+        for src in [
+            file_uri(&file),
+            format!("https://file+.vscode-resource.vscode-cdn.net/{encoded}?version%3D1"),
+            format!("app://49a1b2/{}?1700000000", path.trim_start_matches('/').replace(' ', "%20")),
+        ] {
+            let got = saver.resolve(&src).unwrap_or_else(|| panic!("{src}"));
+            assert_eq!(got.to_str().unwrap().replace('\\', "/").to_lowercase(), path.to_lowercase(), "{src}");
+        }
+        assert!(!out.exists(), "nothing is copied for a file outside the temp directory");
+        assert!(saver.resolve(&format!("https://example.com/{encoded}x")).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
-    fn file_uri_forms() {
-        assert_eq!(file_uri_path("file:///C:/a%20b/c.png").unwrap(), PathBuf::from("C:/a b/c.png"));
-        assert_eq!(file_uri_path("file://localhost/C:/x.png").unwrap(), PathBuf::from("C:/x.png"));
-        assert_eq!(file_uri_path("file:///home/u/x.png").unwrap(), PathBuf::from("/home/u/x.png"));
+    fn only_image_files_are_linked() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("target").join(format!("img-ext-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let saver = ImageSaver::new(scratch("ext"));
+        for name in ["credentials", "id_rsa.pub", "notes.txt", "logo.svg"] {
+            let file = dir.join(name);
+            std::fs::write(&file, b"secret").unwrap();
+            assert!(saver.resolve(&file_uri(&file)).is_none(), "{name}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn work_per_conversion_is_capped() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("target").join(format!("img-cap-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("a.png");
+        std::fs::write(&file, b"x").unwrap();
+        let saver = ImageSaver::new(scratch("cap"));
+        let uri = file_uri(&file);
+        for _ in 0..MAX_IMAGES {
+            assert!(saver.resolve(&uri).is_some());
+        }
+        assert!(saver.resolve(&uri).is_none());
+        let long = format!("{uri}?{}", "/".repeat(MAX_ADDRESS));
+        assert!(ImageSaver::new(scratch("cap")).resolve(&long).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn rejects_what_cannot_be_read() {
+        let saver = ImageSaver::new(scratch("none"));
+        for src in [
+            "cid:image001.png@01DC",
+            "data:text/plain;base64,aGVsbG8=",
+            "data:image/png,rawdata",
+            "data:image/png;base64,***",
+            "https://example.com/a.png",
+            "file:///nowhere/missing.png",
+            "imap://host/INBOX?part=1.2",
+        ] {
+            assert!(saver.resolve(src).is_none(), "{src}");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_candidates() {
+        let has = |src: &str, want: &str| candidates(src).iter().any(|p| p == Path::new(want));
+        assert!(has("https://file+.vscode-resource.vscode-cdn.net/c%3A/Users/K/a%20b.png?v=1", "C:/Users/K/a b.png"));
+        assert!(has("app://49a1/C:/Users/K/Vault/img.png?1700000000", "C:/Users/K/Vault/img.png"));
+        assert!(has("file:///C:/x.png", "C:/x.png"));
+        assert!(has("vscode-resource:/c:/x.png", "C:/x.png"));
+        assert!(!candidates("file://server/share/a.png").iter().chain(&candidates("file:////server/share/a.png")).any(|p| p.to_string_lossy().starts_with(r"\\")));
+        assert!(!candidates("file:///x.png").iter().any(|p| p.to_string_lossy().starts_with("E:")), "the scheme is not a drive");
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn unix_candidates() {
+        let c = candidates("app://49a1/home/k/a%20b.png?1700000000");
+        assert!(c.contains(&PathBuf::from("/home/k/a b.png")) && c.contains(&PathBuf::from("/k/a b.png")), "{c:?}");
+        assert!(candidates("file:///home/k/a.png").first() == Some(&PathBuf::from("/home/k/a.png")));
     }
 
     #[test]

@@ -6,8 +6,8 @@ use pulldown_cmark::{html, Event, Options as MdOptions, Parser};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-/// Stores an embedded image (`data:` or `file:` source) and returns where it now lives.
-pub type SaveImage = Arc<dyn Fn(&str) -> Option<PathBuf> + Send + Sync>;
+/// Path the Markdown should link for an image address, when it can be read from this machine.
+pub type ResolveImage = Arc<dyn Fn(&str) -> Option<PathBuf> + Send + Sync>;
 
 /// Semantic HTML with no styling, so the target editor applies its own defaults.
 ///
@@ -65,9 +65,9 @@ fn end_lists_at_unindented_lines(markdown: &str) -> String {
 /// Markdown from the HTML flavor of a copy made in a mail client, a browser or Word.
 ///
 /// Beyond the standard tags it understands what Outlook and Word emit: list paragraphs
-/// (`mso-list`), highlighted runs (kept as `<mark>`), monospace runs (inline code), and images
-/// embedded in the mail, handed to `save_image` and linked by absolute path.
-pub fn html_to_markdown(html: &str, save_image: SaveImage) -> Result<String, String> {
+/// (`mso-list`), highlighted runs (kept as `<mark>`), monospace runs (inline code), and images,
+/// linked by the absolute path `resolve_image` gives.
+pub fn html_to_markdown(html: &str, resolve_image: ResolveImage) -> Result<String, String> {
     // Non-breaking spaces are layout in mail HTML and noise in Markdown.
     let html = html.replace("&nbsp;", " ").replace('\u{a0}', " ");
     let html = trim_after_line_breaks(&html);
@@ -80,7 +80,7 @@ pub fn html_to_markdown(html: &str, save_image: SaveImage) -> Result<String, Str
             ..Options::default()
         })
         .skip_tags(vec!["style", "script", "title", "xml", "noscript"])
-        .add_handler(vec!["img"], move |handlers: &dyn Handlers, element: &Element| image(handlers, element, &save_image))
+        .add_handler(vec!["img"], move |handlers: &dyn Handlers, element: &Element| image(handlers, element, &resolve_image))
         .add_handler(vec!["span", "font", "mark"], inline_run)
         .add_handler(vec!["p"], word_list_item)
         .add_handler(vec!["br"], line_break)
@@ -247,22 +247,26 @@ fn inline_run(handlers: &dyn Handlers, element: &Element) -> Option<HandlerResul
     Some(wrap_trimmed(&content, |core| format!("<mark>{core}</mark>")).into())
 }
 
-/// Web images stay links. Embedded ones (`data:`, Outlook's `file:` temp copies) are saved and
-/// linked by absolute path; references to mail parts (`cid:`, `imap:`, ...) cannot be resolved.
-fn image(handlers: &dyn Handlers, element: &Element, save_image: &SaveImage) -> Option<HandlerResult> {
+/// Images readable from this machine are linked by absolute path. Other web images stay links;
+/// references to mail parts (`cid:`, `imap:`, ...) cannot be resolved.
+fn image(handlers: &dyn Handlers, element: &Element, resolve_image: &ResolveImage) -> Option<HandlerResult> {
     let src = element.node.attr("src").map(|s| s.trim().to_string()).unwrap_or_default();
+    if let Some(path) = resolve_image(&src) {
+        return Some(image_link(element, &path));
+    }
     let lower = src.to_ascii_lowercase();
     if lower.starts_with("http://") || lower.starts_with("https://") {
         return handlers.fallback(element);
     }
-    let Some(path) = save_image(&src) else {
-        return Some("[image]".into());
-    };
+    Some("[image]".into())
+}
+
+fn image_link(element: &Element, path: &std::path::Path) -> HandlerResult {
     let alt = element.node.attr("alt").map(|a| a.trim().to_string()).filter(|a| !a.is_empty()).unwrap_or_else(|| "image".into());
     let alt = alt.replace('\\', "\\\\").replace('[', "\\[").replace(']', "\\]");
     let dest = path.to_string_lossy().replace('\\', "/");
     let dest = if dest.contains([' ', '(', ')', '<', '>']) { format!("<{}>", dest.replace('<', "%3C").replace('>', "%3E")) } else { dest };
-    Some(format!("![{alt}]({dest})").into())
+    format!("![{alt}]({dest})").into()
 }
 
 /// Marker text and nesting level of a Word list paragraph, which is a `<p>` and not a `<li>`.
@@ -426,10 +430,17 @@ mod tests {
     }
 
     #[test]
+    fn resolved_web_addresses_are_linked_locally() {
+        let resolve: ResolveImage = Arc::new(|src: &str| src.contains("vscode-resource").then(|| PathBuf::from(r"C:\docs\a.png")));
+        let out = html_to_markdown("<img alt='A' src='https://file+.vscode-resource.vscode-cdn.net/c%3A/docs/a.png'> <img alt='B' src='https://example.com/b.png'>", resolve).unwrap();
+        assert_eq!(out, "![A](C:/docs/a.png) ![B](https://example.com/b.png)");
+    }
+
+    #[test]
     fn saved_images_are_linked_by_absolute_path() {
         let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
         let log = seen.clone();
-        let save: SaveImage = Arc::new(move |src: &str| {
+        let save: ResolveImage = Arc::new(move |src: &str| {
             log.lock().unwrap().push(src.to_string());
             Some(PathBuf::from(if src.starts_with("data:") { r"C:\Users\K\Pictures\clip-md-html\20261118-161016-1.png" } else { "/home/k/My Pictures/x.png" }))
         });

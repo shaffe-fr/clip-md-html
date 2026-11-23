@@ -17,7 +17,7 @@ fn read_markdown(cb: &mut arboard::Clipboard) -> Result<String, String> {
 fn markdown_from_html(html: Option<&str>) -> Result<String, String> {
     let html = html.filter(|h| !h.trim().is_empty()).ok_or("the clipboard has no HTML (copy formatted text from a mail or a web page)")?;
     let saver = std::sync::Arc::new(crate::images::ImageSaver::new(crate::paths::images_dir(&crate::paths::process_env)));
-    let markdown = html_to_markdown(html, std::sync::Arc::new(move |src: &str| saver.save(src)))?;
+    let markdown = html_to_markdown(html, std::sync::Arc::new(move |src: &str| saver.resolve(src)))?;
     if markdown.trim().is_empty() {
         return Err("the copied HTML has no text".into());
     }
